@@ -1,5 +1,6 @@
-#include <sodium.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <sodium.h>
 
 void generate_parity_check_matrix(int n, int k, int (*H)[n]) {
     int r = n - k;
@@ -22,8 +23,36 @@ void generate_parity_check_matrix(int n, int k, int (*H)[n]) {
     }
 }
 
-void make_systematic(int n, int k, int (*H)[n]) {
+void swap_columns(int n, int k, int first, int second, int (*H)[n]) {
+    for (int i = 0; i < n - k; ++i) {
+        int temp = H[i][first];
+        H[i][first] = H[i][second];
+        H[i][second] = temp;
+    }
+}
 
+void make_systematic(int n, int k, int (*H)[n]) {
+    int r = n - k;
+    int sum, position, count = 0;
+
+    for (int i = 0; i < n; ++i) {
+        sum = position = 0;
+        
+        for (int j = 0; j < r; ++j) {
+            if (H[j][i] == 1) {
+                position = j;
+                sum += 1;
+            }
+        }
+
+        if (sum == 1) {
+            swap_columns(n, k, i, k + position, H);
+            ++count;
+        }
+
+        if (count == r) 
+            break;
+    }
 }
 
 int main(void)
@@ -43,8 +72,9 @@ int main(void)
 
     // Generate the parity check matrix
     generate_parity_check_matrix(n, k, H_a);
+    make_systematic(n, k, H_a);
 
-    printf("\nParity check matrix:\n");
+    printf("\nSystematic form Parity check matrix:\n");
     for (int i = 0; i < n - k; i++) {
         for (int j = 0; j < n; j++) {
             printf("%d ", H_a[i][j]);
