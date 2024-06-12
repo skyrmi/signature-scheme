@@ -129,32 +129,22 @@ void multiply_matrices_gf2(int rows_a, int cols_a, int cols_b, int a[rows_a][col
     }
 }
 
-void generate_signature(const unsigned char *message, const unsigned int message_len, struct code C_A,
-    struct code C1, struct code C2, int H_A[C_A.t][C_A.n], int G1[C1.k][C1.n], int G2[C2.k][C2.n]) {
-
-
-    printf("\nG1 matrix:\n");
-    for (int i = 0; i < C1.k; i++) {
-        for (int j = 0; j < C1.n; j++) {
-            printf("%d ", G1[i][j]);
-        }
-        printf("\n");
-    }
-
-    printf("\nG2 matrix:\n");
-    for (int i = 0; i < C2.k; i++) {
-        for (int j = 0; j < C2.n; j++) {
-            printf("%d ", G2[i][j]);
-        }
-        printf("\n");
-    }
+void generate_signature(const unsigned char *message, const unsigned int message_len, 
+    struct code C_A, struct code C1, struct code C2, 
+    int H_A[C_A.t][C_A.n], int G1[C1.k][C1.n], int G2[C2.k][C2.n], 
+    int F[C_A.t][C_A.t], int signature[1][C_A.n]) {
 
     unsigned char hash[message_len];
     crypto_generichash(hash, sizeof(hash), message, message_len, NULL, 0);
-    
-    int int_hash[5][message_len];
+
+    int int_hash[1][message_len];
     for (int i = 0; i < message_len; ++i) {
-        int_hash[1][i] = hash[i] % 2;
+        int_hash[0][i] = hash[i] % 2;
+    }
+
+    printf("\nHash: ");
+    for (int i = 0; i < message_len; i++) {
+        printf("%d ", int_hash[0][i]);
     }
 
     int J[C1.n];
@@ -176,7 +166,7 @@ void generate_signature(const unsigned char *message, const unsigned int message
     
     qsort(J, C1.n, sizeof(J[0]), compare_ints);
 
-    printf("\n");
+    printf("\n\nRandom permutation: ");
     for (int i = 0; i < C1.n; ++i) {
         printf("%d ", J[i]);
     }
@@ -206,35 +196,48 @@ void generate_signature(const unsigned char *message, const unsigned int message
         }
     }
 
-    printf("\nG star:\n");
-    for (int i = 0; i < C_A.t; i++) {
-        for (int j = 0; j < C_A.n; j++) {
-            printf("%d ", G_star[i][j]);
-        }
-        printf("\n");
-    }
-
     int G_star_T[C_A.n][C_A.t];
     transpose_matrix(C_A.n, C_A.t, G_star, G_star_T);
-
-    int F[C_A.t][C_A.t];
     multiply_matrices_gf2(C_A.t, C_A.n, C_A.t, H_A, G_star_T, F);
 
-    printf("\nPublic Key, F:\n");
-    for (int i = 0; i < C_A.t; i++) {
-        for (int j = 0; j < C_A.t; j++) {
-            printf("%d ", F[i][j]);
-        }
-        printf("\n");
-    }
-
-    int signature[1][C_A.n];
     multiply_matrices_gf2(1, message_len, C_A.n, int_hash, G_star, signature);
+}
 
-    printf("\nSignature: ");
-    for (int i = 0; i < C_A.n; ++i) {
-        printf("%d ", signature[1][i]);
+void verify_signature(const unsigned char *message, const unsigned int message_len,
+    int sig_len, int signature[1][sig_len], int F_size, int F[F_size][F_size],
+    struct code C_A, int H_A[C_A.t][C_A.n]) {
+
+    unsigned char hash[message_len];
+    crypto_generichash(hash, sizeof(hash), message, message_len, NULL, 0);
+    
+    int hash_T[message_len][1];
+    for (int i = 0; i < message_len; ++i) {
+        hash_T[i][0] = hash[i] % 2;
     }
+
+    printf("\n\nHash: ");
+    for (int i = 0; i < message_len; i++) {
+        printf("%d ", hash_T[i][0]);
+    }
+    printf("\n");
+
+    int left[F_size][1];
+    multiply_matrices_gf2(F_size, F_size, 1, F, hash_T, left);
+
+    printf("\nLHS:\n");
+    for (int i = 0; i < F_size; i++) {
+        printf("%d ", left[0][i]);
+    }
+    printf("\n");
+
+    int right[C_A.t][1];
+    multiply_matrices_gf2(C_A.t, C_A.n, 1, H_A, signature, right);
+
+    printf("\nRHS:\n");
+    for (int i = 0; i < F_size; i++) {
+        printf("%d ", right[0][i]);
+    }
+    printf("\n");
 }
 
 int main(void)
@@ -267,14 +270,48 @@ int main(void)
     struct code C1 = {n / 2, n / 2 - t + 1, t - 1};
     int G1[C1.k][C1.n];
     create_generator_matrix(C1.n, C1.k, G1);
+
+    printf("\nG1 matrix:\n");
+    for (int i = 0; i < C1.k; i++) {
+        for (int j = 0; j < C1.n; j++) {
+            printf("%d ", G1[i][j]);
+        }
+        printf("\n");
+    }
     
     struct code C2 = {n / 2 + 1, n / 2 + 1 - t, t};
     int G2[C2.k][C2.n];
     create_generator_matrix(C2.n, C2.k, G2);
 
+    printf("\nG2 matrix:\n");
+    for (int i = 0; i < C2.k; i++) {
+        for (int j = 0; j < C2.n; j++) {
+            printf("%d ", G2[i][j]);
+        }
+        printf("\n");
+    }
+
     const unsigned char *message = (const unsigned char *) "test";
     const unsigned int message_len = 4;
-    generate_signature(message, message_len, C_A, C1, C2, H_A, G1, G2); 
+
+    int F[C_A.t][C_A.t];
+    int signature[1][C_A.n];
+    generate_signature(message, message_len, C_A, C1, C2, H_A, G1, G2, F, signature); 
+
+    printf("\nPublic Key, F:\n");
+    for (int i = 0; i < C_A.t; i++) {
+        for (int j = 0; j < C_A.t; j++) {
+            printf("%d ", F[i][j]);
+        }
+        printf("\n");
+    }
+
+    printf("\nSignature: ");
+    for (int i = 0; i < C_A.n; ++i) {
+        printf("%d ", signature[1][i]);
+    }
+
+    verify_signature(message, message_len, C_A.n, signature, C_A.t, F, C_A, H_A);
 
     return 0;
 }
