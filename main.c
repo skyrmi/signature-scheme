@@ -115,14 +115,6 @@ void create_generator_matrix(int n, int k, int G[k][n]) {
             G[j][k + i] = H[i][j];
         }
     }
-
-    printf("\nGenerator matrix:\n");
-    for (int i = 0; i < k; i++) {
-        for (int j = 0; j < n; j++) {
-            printf("%d ", G[i][j]);
-        }
-        printf("\n");
-    }
 }
 
 void multiply_matrices_gf2(int rows_a, int cols_a, int cols_b, int a[rows_a][cols_a], int b[][cols_b], int result[rows_a][cols_b]) {
@@ -138,7 +130,24 @@ void multiply_matrices_gf2(int rows_a, int cols_a, int cols_b, int a[rows_a][col
 }
 
 void generate_signature(const unsigned char *message, const unsigned int message_len, struct code C_A,
-    struct code C1, struct code C2, int H_A[C_A.t][C_A.n], int G1[C1.n][C1.k], int G2[C2.n][C2.k]) {
+    struct code C1, struct code C2, int H_A[C_A.t][C_A.n], int G1[C1.k][C1.n], int G2[C2.k][C2.n]) {
+
+
+    printf("\nG1 matrix:\n");
+    for (int i = 0; i < C1.k; i++) {
+        for (int j = 0; j < C1.n; j++) {
+            printf("%d ", G1[i][j]);
+        }
+        printf("\n");
+    }
+
+    printf("\nG2 matrix:\n");
+    for (int i = 0; i < C2.k; i++) {
+        for (int j = 0; j < C2.n; j++) {
+            printf("%d ", G2[i][j]);
+        }
+        printf("\n");
+    }
 
     unsigned char hash[message_len];
     crypto_generichash(hash, sizeof(hash), message, message_len, NULL, 0);
@@ -153,10 +162,8 @@ void generate_signature(const unsigned char *message, const unsigned int message
     label: 
     for (int i = 0; i < C1.n; ++i) {
         J[i] = randombytes_uniform(C_A.n);
-        printf("%d ", J[i]);
         // fix random sampling
     }
-    printf("\n");
     
     // temporary hack for lack of proper random sampling
     for (int i = 0; i < C1.n; ++i) {
@@ -166,48 +173,56 @@ void generate_signature(const unsigned char *message, const unsigned int message
             }
         }
     }
-
+    
     qsort(J, C1.n, sizeof(J[0]), compare_ints);
 
-    int G_star[C_A.k][C_A.n];
+    printf("\n");
+    for (int i = 0; i < C1.n; ++i) {
+        printf("%d ", J[i]);
+    }
+    printf("\n");
+
+
+    int G_star[C_A.t][C_A.n];
 
     int G1_index = 0, G2_index = 0;
     for (int i = 0; i < C_A.n; ++i) {
+
         if (J[G1_index] == i) {
-            for (int col_index = 0; col_index < C1.t; ++col_index) {
-                G_star[i][col_index] = G1[i][col_index];
+            for (int col_index = 0; col_index < C_A.t; ++col_index) {
+                G_star[col_index][i] = G1[col_index][G1_index];
             }
-            if (G1_index < C1.n) {
+            if (G1_index < C1.n - 1) {
                 ++G1_index;
             }
         }
         else {
-            for (int col_index = 0; col_index < C2.t; ++col_index) {
-                G_star[i][col_index] = G2[i][col_index];
+            for (int col_index = 0; col_index < C_A.t; ++col_index) {
+                G_star[col_index][i] = G2[col_index][G2_index];
             }
-            if (G2_index < C2.n) {
+            if (G2_index < C2.n - 1) {
                 ++G2_index;
             }
         }
     }
 
     printf("\nG star:\n");
-    for (int i = 0; i < C_A.k; i++) {
+    for (int i = 0; i < C_A.t; i++) {
         for (int j = 0; j < C_A.n; j++) {
             printf("%d ", G_star[i][j]);
         }
         printf("\n");
     }
 
-    int G_star_T[C_A.n][C_A.k];
-    transpose_matrix(C_A.n, C_A.k, G_star, G_star_T);
+    int G_star_T[C_A.n][C_A.t];
+    transpose_matrix(C_A.n, C_A.t, G_star, G_star_T);
 
-    int F[C_A.t][C_A.n];
-    multiply_matrices_gf2(C_A.t, C_A.n, C_A.k, H_A, G_star_T, F);
+    int F[C_A.t][C_A.t];
+    multiply_matrices_gf2(C_A.t, C_A.n, C_A.t, H_A, G_star_T, F);
 
     printf("\nPublic Key, F:\n");
     for (int i = 0; i < C_A.t; i++) {
-        for (int j = 0; j < C_A.n; j++) {
+        for (int j = 0; j < C_A.t; j++) {
             printf("%d ", F[i][j]);
         }
         printf("\n");
@@ -250,11 +265,11 @@ int main(void)
     }
 
     struct code C1 = {n / 2, n / 2 - t + 1, t - 1};
-    int G1[C1.n][C1.k];
+    int G1[C1.k][C1.n];
     create_generator_matrix(C1.n, C1.k, G1);
     
     struct code C2 = {n / 2 + 1, n / 2 + 1 - t, t};
-    int G2[C2.n][C2.k];
+    int G2[C2.k][C2.n];
     create_generator_matrix(C2.n, C2.k, G2);
 
     const unsigned char *message = (const unsigned char *) "test";
