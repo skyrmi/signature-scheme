@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sodium.h>
 
 void generate_parity_check_matrix(int n, int k, int (*H)[n]) {
@@ -77,6 +78,41 @@ void make_systematic(int num_rows, int num_cols, int (*H)[num_cols]) {
     }
 }
 
+void transpose_matrix(int rows, int cols, int **matrix, int **transpose) {
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            transpose[j][i] = matrix[i][j];
+        }
+    }
+}
+
+void create_generator_matrix(int n, int k) {
+    int H[n - k][n];
+    generate_parity_check_matrix(n, k, H);    
+    make_systematic(n - k, n, H);
+
+    int G[k][n];
+    for (int i = 0; i < k; ++i) {
+        for (int j = 0; j < k; ++j) {
+            G[i][j] = (i == j) ? 1 : 0;
+        }
+    }
+
+    for (int i = 0; i < n - k; ++i) {
+        for (int j = 0; j < k; ++j) {
+            G[j][k + i] = H[i][j];
+        }
+    }
+
+    printf("\nGenerator matrix:\n");
+    for (int i = 0; i < k; i++) {
+        for (int j = 0; j < n; j++) {
+            printf("%d ", G[i][j]);
+        }
+        printf("\n");
+    }
+}
+
 int main(void)
 {
     if (sodium_init() < 0) {
@@ -85,12 +121,12 @@ int main(void)
 
     int n, k, t;
 
-    n = 8;
+    n = 7;
     k = 4;
-    t = 4;
+    t = 3;
 
     // Allocate memory for the parity check matrix and generator matrix
-    int (*H_a)[n] = malloc(sizeof(int[n - k][n]));
+    int H_a[n - k][n];
 
     // Generate the parity check matrix
     generate_parity_check_matrix(n, k, H_a);
@@ -112,7 +148,8 @@ int main(void)
         printf("\n");
     }
 
-    // Free the allocated memory
-    free(H_a);
+    create_generator_matrix(n, k);
+
+    
     return 0;
 }
