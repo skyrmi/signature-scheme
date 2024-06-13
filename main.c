@@ -179,7 +179,7 @@ void generate_signature(const unsigned char *message, const unsigned int message
     int G_star[C_A.t][C_A.n];
 
     int G1_index = 0, G2_index = 0;
-    for (int i = 0; i <= C_A.n; ++i) {
+    for (int i = 0; i < C_A.n; ++i) {
 
         if (J[G1_index] == i) {
             for (int col_index = 0; col_index < C_A.t; ++col_index) {
@@ -240,7 +240,6 @@ void verify_signature(const unsigned char *message, const unsigned int message_l
         printf("%d ", left[0][i]);
     }
     printf("\n");
-
 
     int sig_T[sig_len][1];
     transpose_matrix(1, sig_len, signature, sig_T);
