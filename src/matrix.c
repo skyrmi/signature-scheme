@@ -1,7 +1,7 @@
 #include <stdio.h>
 
-void print_matrix(int rows, int cols, int matrix[rows][cols], const char *name) {
-    printf("\n%s\n", name);
+void print_matrix(int rows, int cols, int matrix[rows][cols], const char *label) {
+    printf("\n%s\n", label);
     for (int i = 0; i < rows; i++) {
         for (int j = 0; j < cols; j++) {
             printf("%d ", matrix[i][j]);

@@ -127,24 +127,14 @@ void verify_signature(const unsigned char *message, const unsigned int message_l
 
     int left[F_size][1];
     multiply_matrices_gf2(F_size, F_size, 1, F, hash_T, left);
-
-    printf("\nLHS:\n");
-    for (int i = 0; i < F_size; i++) {
-        printf("%d ", left[0][i]);
-    }
-    printf("\n");
+    print_matrix(1, F_size, left, "LHS:");
 
     int sig_T[sig_len][1];
     transpose_matrix(1, sig_len, signature, sig_T);
 
     int right[C_A.t][1];
     multiply_matrices_gf2(C_A.t, C_A.n, 1, H_A, sig_T, right);
-
-    printf("\nRHS:\n");
-    for (int i = 0; i < F_size; i++) {
-        printf("%d ", right[0][i]);
-    }
-    printf("\n");
+    print_matrix(1, F_size, right, "RHS:");
 }
 
 int main(void)
@@ -154,26 +144,19 @@ int main(void)
         exit(EXIT_FAILURE);
     }
 
-    int n, k, t;
-
-    n = 15;
-    k = 11;
-    t = 4;
-
-    // Allocate memory for the parity check matrix and generator matrix
     struct code C_A = {15, 11, 4};
-    int H_A[n - k][n];
+    int H_A[C_A.t][C_A.n];
 
     // Generate the parity check matrix
     generate_parity_check_matrix(n, k, H_A);
-    print_matrix(n - k, n, H_A, "Parity check matrix, H_A:");
+    print_matrix(C_A.t, C_A.n, H_A, "Parity check matrix, H_A:");
 
-    struct code C1 = {n / 2, n / 2 - t + 1, t - 1};
+    struct code C1 = {C_A.n / 2, C_A.n / 2 - C_A.t + 1, C_A.t - 1};
     int G1[C1.k][C1.n];
     create_generator_matrix(C1.n, C1.k, G1);
     print_matrix(C1.k, C1.n, G1, "Generator G1:");
     
-    struct code C2 = {n / 2 + 1, n / 2 - t + 1, t};
+    struct code C2 = {C_A.n / 2 + 1, C_A.n / 2 - C_A.t + 1, C_A.t};
     int G2[C2.k][C2.n];
     create_generator_matrix(C2.n, C2.k, G2);
     print_matrix(C2.k, C2.n, G2, "Generator G2:");
