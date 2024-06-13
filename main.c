@@ -129,6 +129,26 @@ void multiply_matrices_gf2(int rows_a, int cols_a, int cols_b, int a[rows_a][col
     }
 }
 
+void generate_random_set(struct code C_A, struct code C1, int J[C1.n]) {
+    int arr[C_A.n];
+    for (int i = 0; i < C_A.n; i++) {
+        arr[i] = i;
+    }
+
+    for (int i = C_A.n - 1; i > 0; i--) {
+        int j = randombytes_uniform(i + 1);
+        int temp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = temp;
+    }
+
+    for (int i = 0; i < C1.n; ++i) {
+        J[i] = arr[i];
+    }
+
+    qsort(J, C1.n, sizeof(J[0]), compare_ints);
+}
+
 void generate_signature(const unsigned char *message, const unsigned int message_len, 
     struct code C_A, struct code C1, struct code C2, 
     int H_A[C_A.t][C_A.n], int G1[C1.k][C1.n], int G2[C2.k][C2.n], 
@@ -148,23 +168,7 @@ void generate_signature(const unsigned char *message, const unsigned int message
     }
 
     int J[C1.n];
-
-    label: 
-    for (int i = 0; i < C1.n; ++i) {
-        J[i] = randombytes_uniform(C_A.n);
-        // fix random sampling
-    }
-    
-    // temporary hack for lack of proper random sampling
-    for (int i = 0; i < C1.n; ++i) {
-        for (int j = i + 1; j < C1.n; ++j) {
-            if (J[i] == J[j]) {
-                goto label;
-            }
-        }
-    }
-    
-    qsort(J, C1.n, sizeof(J[0]), compare_ints);
+    generate_random_set(C_A, C1, J);
 
     printf("\n\nRandom permutation: ");
     for (int i = 0; i < C1.n; ++i) {
@@ -172,11 +176,10 @@ void generate_signature(const unsigned char *message, const unsigned int message
     }
     printf("\n");
 
-
     int G_star[C_A.t][C_A.n];
 
     int G1_index = 0, G2_index = 0;
-    for (int i = 0; i < C_A.n; ++i) {
+    for (int i = 0; i <= C_A.n; ++i) {
 
         if (J[G1_index] == i) {
             for (int col_index = 0; col_index < C_A.t; ++col_index) {
@@ -196,8 +199,16 @@ void generate_signature(const unsigned char *message, const unsigned int message
         }
     }
 
+    printf("\nG_star:\n");
+    for (int i = 0; i < C_A.t; i++) {
+        for (int j = 0; j < C_A.n; j++) {
+            printf("%d ", G_star[i][j]);
+        }
+        printf("\n");
+    }
+
     int G_star_T[C_A.n][C_A.t];
-    transpose_matrix(C_A.n, C_A.t, G_star, G_star_T);
+    transpose_matrix(C_A.t, C_A.n, G_star, G_star_T);
     multiply_matrices_gf2(C_A.t, C_A.n, C_A.t, H_A, G_star_T, F);
 
     multiply_matrices_gf2(1, message_len, C_A.n, int_hash, G_star, signature);
@@ -230,8 +241,12 @@ void verify_signature(const unsigned char *message, const unsigned int message_l
     }
     printf("\n");
 
+
+    int sig_T[sig_len][1];
+    transpose_matrix(1, sig_len, signature, sig_T);
+
     int right[C_A.t][1];
-    multiply_matrices_gf2(C_A.t, C_A.n, 1, H_A, signature, right);
+    multiply_matrices_gf2(C_A.t, C_A.n, 1, H_A, sig_T, right);
 
     printf("\nRHS:\n");
     for (int i = 0; i < F_size; i++) {
@@ -259,6 +274,8 @@ int main(void)
 
     // Generate the parity check matrix
     generate_parity_check_matrix(n, k, H_A);
+
+
     printf("\nParity check matrix:\n");
     for (int i = 0; i < n - k; i++) {
         for (int j = 0; j < n; j++) {
@@ -308,7 +325,7 @@ int main(void)
 
     printf("\nSignature: ");
     for (int i = 0; i < C_A.n; ++i) {
-        printf("%d ", signature[1][i]);
+        printf("%d ", signature[0][i]);
     }
 
     verify_signature(message, message_len, C_A.n, signature, C_A.t, F, C_A, H_A);
