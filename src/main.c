@@ -1,20 +1,11 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <sodium.h>
+#include "matrix.h"
+#include "utils.h"
 
 struct code {
     int n, k, t;
 };
-
-int compare_ints(const void* a, const void* b)
-{
-    int arg1 = *(const int*) a;
-    int arg2 = *(const int*) b;
- 
-    if (arg1 < arg2) return -1;
-    if (arg1 > arg2) return 1;
-    return 0;
-}
 
 void generate_parity_check_matrix(int n, int k, int (*H)[n]) {
     int r = n - k;
@@ -44,65 +35,11 @@ void generate_parity_check_matrix(int n, int k, int (*H)[n]) {
     }
 }
 
-void make_systematic(int num_rows, int num_cols, int (*H)[num_cols]) {
-    int current_col, current_row = 1;
-
-    for (current_col = num_cols - num_rows + 1; current_col <= num_cols; current_col++) {
-        if (H[current_row - 1][current_col - 1] == 0) {
-            // Find a non-zero element in the current column to swap with the current row
-            for (int swap_row = current_row; swap_row < num_rows; swap_row++) {
-                if (H[swap_row][current_col - 1] != 0) {
-                    // Swap the current row with the row containing the non-zero element
-                    for (int j = 0; j < num_cols; j++) {
-                        int temp = H[current_row - 1][j];
-                        H[current_row - 1][j] = H[swap_row][j];
-                        H[swap_row][j] = temp;
-                    }
-                    break;
-                }
-            }   
-        }
-
-        // Check if the matrix is singular
-        if (H[current_row - 1][current_col - 1] == 0) {
-            printf("The parity check matrix is singular\n");
-            return;
-        }
-
-        // Forward substitution
-        for (int swap_row = current_row; swap_row < num_rows; swap_row++) {
-            if (H[swap_row][current_col - 1] == 1) {
-                for (int j = 0; j < num_cols; j++) {
-                    H[swap_row][j] ^= H[current_row - 1][j];
-                }
-            }
-        }
-
-        // Back substitution
-        for (int swap_row = 0; swap_row < current_row - 1; swap_row++) {
-            if (H[swap_row][current_col - 1] == 1) {
-                for (int j = 0; j < num_cols; j++) {
-                    H[swap_row][j] ^= H[current_row - 1][j];
-                }
-            }
-        }
-
-        current_row++;
-    }
-}
-
-void transpose_matrix(int rows, int cols, int matrix[rows][cols], int transpose[cols][rows]) {
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-            transpose[j][i] = matrix[i][j];
-        }
-    }
-}
-
+// Convert parity check matrix to systematic form and create generator
 void create_generator_matrix(int n, int k, int G[k][n]) {
     int H[n - k][n];
     generate_parity_check_matrix(n, k, H);    
-    make_systematic(n - k, n, H);
+    rref(n - k, n, H);
 
     for (int i = 0; i < k; ++i) {
         for (int j = 0; j < k; ++j) {
@@ -117,38 +54,6 @@ void create_generator_matrix(int n, int k, int G[k][n]) {
     }
 }
 
-void multiply_matrices_gf2(int rows_a, int cols_a, int cols_b, int a[rows_a][cols_a], int b[][cols_b], int result[rows_a][cols_b]) {
-    for (int i = 0; i < rows_a; i++) {
-        for (int j = 0; j < cols_b; j++) {
-            result[i][j] = 0;
-
-            for (int k = 0; k < cols_a; k++) {
-                result[i][j] ^= (a[i][k] & b[k][j]);  
-            }
-        }
-    }
-}
-
-void generate_random_set(struct code C_A, struct code C1, int J[C1.n]) {
-    int arr[C_A.n];
-    for (int i = 0; i < C_A.n; i++) {
-        arr[i] = i;
-    }
-
-    for (int i = C_A.n - 1; i > 0; i--) {
-        int j = randombytes_uniform(i + 1);
-        int temp = arr[i];
-        arr[i] = arr[j];
-        arr[j] = temp;
-    }
-
-    for (int i = 0; i < C1.n; ++i) {
-        J[i] = arr[i];
-    }
-
-    qsort(J, C1.n, sizeof(J[0]), compare_ints);
-}
-
 void generate_signature(const unsigned char *message, const unsigned int message_len, 
     struct code C_A, struct code C1, struct code C2, 
     int H_A[C_A.t][C_A.n], int G1[C1.k][C1.n], int G2[C2.k][C2.n], 
@@ -161,14 +66,10 @@ void generate_signature(const unsigned char *message, const unsigned int message
     for (int i = 0; i < message_len; ++i) {
         int_hash[0][i] = hash[i] % 2;
     }
-
-    printf("\nHash: ");
-    for (int i = 0; i < message_len; i++) {
-        printf("%d ", int_hash[0][i]);
-    }
+    print_matrix(1, message_len, int_hash, "Hash:");
 
     int J[C1.n];
-    generate_random_set(C_A, C1, J);
+    generate_random_set(C_A.n, C1.n, J);
 
     printf("\n\nRandom permutation: ");
     for (int i = 0; i < C1.n; ++i) {
@@ -198,19 +99,11 @@ void generate_signature(const unsigned char *message, const unsigned int message
             }
         }
     }
-
-    printf("\nG_star:\n");
-    for (int i = 0; i < C_A.t; i++) {
-        for (int j = 0; j < C_A.n; j++) {
-            printf("%d ", G_star[i][j]);
-        }
-        printf("\n");
-    }
+    print_matrix(C_A.t, C_A.n, G_star, "G_star:");
 
     int G_star_T[C_A.n][C_A.t];
     transpose_matrix(C_A.t, C_A.n, G_star, G_star_T);
     multiply_matrices_gf2(C_A.t, C_A.n, C_A.t, H_A, G_star_T, F);
-
     multiply_matrices_gf2(1, message_len, C_A.n, int_hash, G_star, signature);
 }
 
@@ -273,59 +166,27 @@ int main(void)
 
     // Generate the parity check matrix
     generate_parity_check_matrix(n, k, H_A);
-
-
-    printf("\nParity check matrix:\n");
-    for (int i = 0; i < n - k; i++) {
-        for (int j = 0; j < n; j++) {
-            printf("%d ", H_A[i][j]);
-        }
-        printf("\n");
-    }
+    print_matrix(n - k, n, H_A, "Parity check matrix, H_A:");
 
     struct code C1 = {n / 2, n / 2 - t + 1, t - 1};
     int G1[C1.k][C1.n];
     create_generator_matrix(C1.n, C1.k, G1);
-
-    printf("\nG1 matrix:\n");
-    for (int i = 0; i < C1.k; i++) {
-        for (int j = 0; j < C1.n; j++) {
-            printf("%d ", G1[i][j]);
-        }
-        printf("\n");
-    }
+    print_matrix(C1.k, C1.n, G1, "Generator G1:");
     
-    struct code C2 = {n / 2 + 1, n / 2 + 1 - t, t};
+    struct code C2 = {n / 2 + 1, n / 2 - t + 1, t};
     int G2[C2.k][C2.n];
     create_generator_matrix(C2.n, C2.k, G2);
+    print_matrix(C2.k, C2.n, G2, "Generator G2:");
 
-    printf("\nG2 matrix:\n");
-    for (int i = 0; i < C2.k; i++) {
-        for (int j = 0; j < C2.n; j++) {
-            printf("%d ", G2[i][j]);
-        }
-        printf("\n");
-    }
-
-    const unsigned char *message = (const unsigned char *) "test";
+    const unsigned char *message = (const unsigned char *) "abcdef";
     const unsigned int message_len = 4;
 
     int F[C_A.t][C_A.t];
     int signature[1][C_A.n];
     generate_signature(message, message_len, C_A, C1, C2, H_A, G1, G2, F, signature); 
-
-    printf("\nPublic Key, F:\n");
-    for (int i = 0; i < C_A.t; i++) {
-        for (int j = 0; j < C_A.t; j++) {
-            printf("%d ", F[i][j]);
-        }
-        printf("\n");
-    }
-
-    printf("\nSignature: ");
-    for (int i = 0; i < C_A.n; ++i) {
-        printf("%d ", signature[0][i]);
-    }
+    
+    print_matrix(C_A.t, C_A.t, F, "Public Key, F:");
+    print_matrix(1, C_A.n, signature, "Signature:");
 
     verify_signature(message, message_len, C_A.n, signature, C_A.t, F, C_A, H_A);
 
