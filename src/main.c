@@ -119,11 +119,7 @@ void verify_signature(const unsigned char *message, const unsigned int message_l
         hash_T[i][0] = hash[i] % 2;
     }
 
-    printf("\n\nHash: ");
-    for (int i = 0; i < message_len; i++) {
-        printf("%d ", hash_T[i][0]);
-    }
-    printf("\n");
+    print_matrix(1, message_len, hash_T, "Hash:");
 
     int left[F_size][1];
     multiply_matrices_gf2(F_size, F_size, 1, F, hash_T, left);
@@ -146,9 +142,7 @@ int main(void)
 
     struct code C_A = {15, 11, 4};
     int H_A[C_A.t][C_A.n];
-
-    // Generate the parity check matrix
-    generate_parity_check_matrix(n, k, H_A);
+    generate_parity_check_matrix(C_A.n, C_A.k, H_A);
     print_matrix(C_A.t, C_A.n, H_A, "Parity check matrix, H_A:");
 
     struct code C1 = {C_A.n / 2, C_A.n / 2 - C_A.t + 1, C_A.t - 1};
