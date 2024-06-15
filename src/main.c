@@ -39,7 +39,9 @@ void generate_parity_check_matrix(int n, int k, int (*H)[n]) {
 void create_generator_matrix(int n, int k, int G[k][n]) {
     int H[n - k][n];
     generate_parity_check_matrix(n, k, H);    
+    // print_matrix(n - k, n, H, "Parity Check Matrix (before rref): ");
     rref(n - k, n, H);
+    // print_matrix(n - k, n, H, "Parity Check Matrix: ");
 
     for (int i = 0; i < k; ++i) {
         for (int j = 0; j < k; ++j) {
@@ -77,13 +79,13 @@ void generate_signature(const unsigned char *message, const unsigned int message
     }
     printf("\n");
 
-    int G_star[C_A.t][C_A.n];
+    int G_star[C1.k][C_A.n];
 
     int G1_index = 0, G2_index = 0;
     for (int i = 0; i < C_A.n; ++i) {
 
         if (J[G1_index] == i) {
-            for (int col_index = 0; col_index < C_A.t; ++col_index) {
+            for (int col_index = 0; col_index < C1.k; ++col_index) {
                 G_star[col_index][i] = G1[col_index][G1_index];
             }
             if (G1_index < C1.n - 1) {
@@ -91,7 +93,7 @@ void generate_signature(const unsigned char *message, const unsigned int message
             }
         }
         else {
-            for (int col_index = 0; col_index < C_A.t; ++col_index) {
+            for (int col_index = 0; col_index < C2.k; ++col_index) {
                 G_star[col_index][i] = G2[col_index][G2_index];
             }
             if (G2_index < C2.n - 1) {
@@ -99,7 +101,7 @@ void generate_signature(const unsigned char *message, const unsigned int message
             }
         }
     }
-    print_matrix(C_A.t, C_A.n, G_star, "G_star:");
+    print_matrix(C1.k, C_A.n, G_star, "G_star:");
 
     int G_star_T[C_A.n][C_A.t];
     transpose_matrix(C_A.t, C_A.n, G_star, G_star_T);
@@ -140,6 +142,7 @@ int main(void)
         exit(EXIT_FAILURE);
     }
 
+    printf("\n-----------Key Generation-----------\n");
     struct code C_A = {15, 11, 4};
     int H_A[C_A.t][C_A.n];
     generate_parity_check_matrix(C_A.n, C_A.k, H_A);
@@ -155,9 +158,10 @@ int main(void)
     create_generator_matrix(C2.n, C2.k, G2);
     print_matrix(C2.k, C2.n, G2, "Generator G2:");
 
-    const unsigned char *message = (const unsigned char *) "abcdef";
-    const unsigned int message_len = 4;
+    const unsigned char *message = (const unsigned char *) "adfdbcdef";
+    const unsigned int message_len = 5;
 
+    printf("\n-----------Message Signature-----------\n");
     int F[C_A.t][C_A.t];
     int signature[1][C_A.n];
     generate_signature(message, message_len, C_A, C1, C2, H_A, G1, G2, F, signature); 
@@ -165,6 +169,7 @@ int main(void)
     print_matrix(C_A.t, C_A.t, F, "Public Key, F:");
     print_matrix(1, C_A.n, signature, "Signature:");
 
+    printf("\n-----------Verification-----------\n");
     verify_signature(message, message_len, C_A.n, signature, C_A.t, F, C_A, H_A);
 
     return 0;
