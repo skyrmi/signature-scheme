@@ -51,7 +51,7 @@ void rref(int num_rows, int num_cols, int (*H)[num_cols]) {
 
         // Check if the matrix is singular
         if (H[current_row - 1][current_col - 1] == 0) {
-            printf("The parity check matrix is singular\n");
+            printf("\nThe parity check matrix is singular\n");
             return;
         }
 
