@@ -109,8 +109,8 @@ void generate_signature(const unsigned char *message, const unsigned int message
     print_matrix(C1.k, C_A.n, G_star, "G_star:");
 
     int (*G_star_T)[C1.k] = malloc(sizeof(int[C_A.n][C1.k]));
-    transpose_matrix(C_A.t, C_A.n, G_star, G_star_T);
-    multiply_matrices_gf2(C_A.t, C_A.n, C_A.t, H_A, G_star_T, F);
+    transpose_matrix(C1.k, C_A.n, G_star, G_star_T);
+    multiply_matrices_gf2(C_A.t, C_A.n, C1.k, H_A, G_star_T, F);
     multiply_matrices_gf2(1, message_len, C_A.n, int_hash, G_star, signature);
 
     free(int_hash);
@@ -120,7 +120,7 @@ void generate_signature(const unsigned char *message, const unsigned int message
 }
 
 void verify_signature(const unsigned char *message, const unsigned int message_len,
-    int sig_len, int signature[1][sig_len], int F_size, int F[F_size][F_size],
+    int sig_len, int signature[1][sig_len], int F_rows, int F_cols, int F[F_rows][F_cols],
     struct code C_A, int H_A[C_A.t][C_A.n]) {
 
     unsigned char hash[message_len];
@@ -132,16 +132,16 @@ void verify_signature(const unsigned char *message, const unsigned int message_l
     }
     print_matrix(1, message_len, hash_T, "Hash:");
 
-    int (*left)[1] = malloc(sizeof(int[F_size][1]));
-    multiply_matrices_gf2(F_size, F_size, 1, F, hash_T, left);
-    print_matrix(1, F_size, left, "LHS:");
+    int (*left)[1] = malloc(sizeof(int[F_rows][1]));
+    multiply_matrices_gf2(F_rows, F_cols, 1, F, hash_T, left);
+    print_matrix(1, F_rows, left, "LHS:");
 
     int (*sig_T)[1] = malloc(sizeof(int[sig_len][1]));
     transpose_matrix(1, sig_len, signature, sig_T);
 
     int (*right)[1] = malloc(sizeof(int[C_A.t][1]));
     multiply_matrices_gf2(C_A.t, C_A.n, 1, H_A, sig_T, right);
-    print_matrix(1, F_size, right, "RHS:");
+    print_matrix(1, F_rows, right, "RHS:");
 
     free(hash_T);
     free(left);
@@ -156,7 +156,7 @@ int main(void)
         exit(EXIT_FAILURE);
     }
 
-    int m = 8;
+    int m = 4;
 
     printf("\n-----------Key Generation-----------\n");
     struct code C_A = {pow(2, m) - 1, pow(2, m) - m - 1, m};
@@ -178,15 +178,15 @@ int main(void)
     const unsigned int message_len = C1.k;
 
     printf("\n-----------Message Signature-----------\n");
-    int (*F)[C_A.t] = malloc(sizeof(int[C_A.t][C_A.t]));
+    int (*F)[C_A.t] = malloc(sizeof(int[C_A.t][C1.k]));
     int (*signature)[C_A.n] = malloc(sizeof(int[1][C_A.n]));
     generate_signature(message, message_len, C_A, C1, C2, H_A, G1, G2, F, signature); 
     
-    print_matrix(C_A.t, C_A.t, F, "Public Key, F:");
+    print_matrix(C_A.t, C1.k, F, "Public Key, F:");
     print_matrix(1, C_A.n, signature, "Signature:");
 
     printf("\n-----------Verification-----------\n");
-    verify_signature(message, message_len, C_A.n, signature, C_A.t, F, C_A, H_A);
+    verify_signature(message, message_len, C_A.n, signature, C_A.t, C1.k, F, C_A, H_A);
 
     free(H_A);
     free(G1);
