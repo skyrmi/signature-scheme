@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdbool.h>
+#include <math.h>
 #include <sodium.h>
 #include "matrix.h"
 #include "utils.h"
@@ -155,8 +156,10 @@ int main(void)
         exit(EXIT_FAILURE);
     }
 
+    int m = 8;
+
     printf("\n-----------Key Generation-----------\n");
-    struct code C_A = {15, 11, 4};
+    struct code C_A = {pow(2, m) - 1, pow(2, m) - m - 1, m};
     int (*H_A)[C_A.n] = malloc(sizeof(int[C_A.t][C_A.n]));
     generate_parity_check_matrix(C_A.n, C_A.k, H_A);
     print_matrix(C_A.t, C_A.n, H_A, "Parity check matrix, H_A:");
@@ -171,8 +174,8 @@ int main(void)
     create_generator_matrix(C2.n, C2.k, G2, true);
     print_matrix(C2.k, C2.n, G2, "Generator G2:");
 
-    const unsigned char *message = (const unsigned char *) "adfdbcdef";
-    const unsigned int message_len = C_A.t;
+    const unsigned char *message = (const unsigned char *) "adfdbcdedfdf";
+    const unsigned int message_len = C1.k;
 
     printf("\n-----------Message Signature-----------\n");
     int (*F)[C_A.t] = malloc(sizeof(int[C_A.t][C_A.t]));
