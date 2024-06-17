@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdbool.h>
 #include <sodium.h>
 #include "matrix.h"
 #include "utils.h"
@@ -26,22 +27,13 @@ void generate_parity_check_matrix(int n, int k, int (*H)[n]) {
             }
         }
     }
-
-    // For extended codes, set last row to 1
-    if (n % 2 == 0) {
-        for (int i = 0; i < n; ++i) {
-            H[r - 1][i] = 1;
-        }
-    }
 }
 
 // Convert parity check matrix to systematic form and create generator
-void create_generator_matrix(int n, int k, int G[k][n]) {
+void create_generator_matrix(int n, int k, int G[k][n], bool extended) {
     int H[n - k][n];
     generate_parity_check_matrix(n, k, H);    
-    // print_matrix(n - k, n, H, "Parity Check Matrix (before rref): ");
-    rref(n - k, n, H);
-    // print_matrix(n - k, n, H, "Parity Check Matrix: ");
+    make_systematic(n, k, H);
 
     for (int i = 0; i < k; ++i) {
         for (int j = 0; j < k; ++j) {
@@ -52,6 +44,16 @@ void create_generator_matrix(int n, int k, int G[k][n]) {
     for (int i = 0; i < n - k; ++i) {
         for (int j = 0; j < k; ++j) {
             G[j][k + i] = H[i][j];
+        }
+    }
+
+    if (extended) {
+        for (int i = 0; i < k; ++i) {
+            int xor_sum = 0;
+            for (int j = 0; j < n; ++j) {
+                xor_sum ^= G[i][j];
+            }
+            G[i][n - 1] = xor_sum;
         }
     }
 }
@@ -73,7 +75,7 @@ void generate_signature(const unsigned char *message, const unsigned int message
     int J[C1.n];
     generate_random_set(C_A.n, C1.n, J);
 
-    printf("\n\nRandom permutation: ");
+    printf("\nRandom permutation: ");
     for (int i = 0; i < C1.n; ++i) {
         printf("%d ", J[i]);
     }
@@ -150,16 +152,16 @@ int main(void)
 
     struct code C1 = {C_A.n / 2, C_A.n / 2 - C_A.t + 1, C_A.t - 1};
     int G1[C1.k][C1.n];
-    create_generator_matrix(C1.n, C1.k, G1);
+    create_generator_matrix(C1.n, C1.k, G1, false);
     print_matrix(C1.k, C1.n, G1, "Generator G1:");
     
     struct code C2 = {C_A.n / 2 + 1, C_A.n / 2 - C_A.t + 1, C_A.t};
     int G2[C2.k][C2.n];
-    create_generator_matrix(C2.n, C2.k, G2);
+    create_generator_matrix(C2.n, C2.k, G2, true);
     print_matrix(C2.k, C2.n, G2, "Generator G2:");
 
     const unsigned char *message = (const unsigned char *) "adfdbcdef";
-    const unsigned int message_len = 5;
+    const unsigned int message_len = C_A.t;
 
     printf("\n-----------Message Signature-----------\n");
     int F[C_A.t][C_A.t];
