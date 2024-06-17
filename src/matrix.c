@@ -30,6 +30,38 @@ void multiply_matrices_gf2(int rows_a, int cols_a, int cols_b, int a[rows_a][col
     }
 }
 
+static void swap_columns(int n, int k, int first, int second, int (*H)[n]) {
+    for (int i = 0; i < n - k; ++i) {
+        int temp = H[i][first];
+        H[i][first] = H[i][second];
+        H[i][second] = temp;
+    }
+}
+
+void make_systematic(int n, int k, int (*H)[n]) {
+    int r = n - k;
+    int sum, position, count = 0;
+
+    for (int i = 0; i < n; ++i) {
+        sum = position = 0;
+
+        for (int j = 0; j < r; ++j) {
+            if (H[j][i] == 1) {
+                position = j;
+                sum += 1;
+            }
+        }
+
+        if (sum == 1) {
+            swap_columns(n, k, i, k + position, H);
+            ++count;
+        }
+
+        if (count == r) 
+            break;
+    }
+}
+
 void rref(int num_rows, int num_cols, int (*H)[num_cols]) {
     int current_col, current_row = 1;
 
