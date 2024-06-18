@@ -13,7 +13,7 @@ static int compare_ints(const void* a, const void* b)
 
 // Fisher Yates shuffle
 void generate_random_set(int upper_bound, int size, int set[size]) {
-    int arr[upper_bound];
+    int *arr = malloc(upper_bound * sizeof(int));
     for (int i = 0; i < upper_bound; i++) {
         arr[i] = i;
     }
@@ -24,6 +24,7 @@ void generate_random_set(int upper_bound, int size, int set[size]) {
         arr[i] = arr[j];
         arr[j] = temp;
     }
+    free(arr);
 
     for (int i = 0; i < size; ++i) {
         set[i] = arr[i];
