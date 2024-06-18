@@ -3,8 +3,8 @@
 
 void print_matrix(int rows, int cols, int matrix[rows][cols], const char *name);
 void transpose_matrix(int rows, int cols, int matrix[rows][cols], int transpose[cols][rows]);
-void multiply_matrices_gf2(int rows_a, int cols_a, int cols_b, int a[rows_a][cols_a], int b[][cols_b], int result[rows_a][cols_b]);
-void make_systematic(int n, int k, int (*H)[n]);
+void multiply_matrices_gf2(bool_mat_t C, bool_mat_t A, bool_mat_t B);
+void make_systematic(unsigned long n, unsigned long k, bool_mat_t H);
 void rref(int num_rows, int num_cols, int (*H)[num_cols]);
 
 #endif
