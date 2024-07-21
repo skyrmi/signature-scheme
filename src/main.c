@@ -7,6 +7,8 @@
 #include "matrix.h"
 #include "utils.h"
 
+#define PRINT true
+
 struct code {
     unsigned long n, k, t;
 };
@@ -15,8 +17,7 @@ void generate_parity_check_matrix(unsigned long n, unsigned long k, bool_mat_t H
     int r = n - k;
     
     bool_mat_zero(H);
-
-    // Fill the parity check matrix
+    
     for (size_t i = 0; i < r; ++i) {
         for (size_t j = 0; j < n; ++j) {
             // set to 1 if ith parity bit is set
@@ -69,17 +70,20 @@ void generate_signature(const unsigned char *message, const unsigned long messag
         int val = hash[i % sizeof(hash)] % 2;
         bool_mat_set_entry(bin_hash, 0, i, val);
     }
-    // printf("\nHash:\n\n");
-    // bool_mat_print(bin_hash);
 
     unsigned long *J = malloc(C1.n * sizeof(unsigned long));
     generate_random_set(C_A.n, C1.n, J);
 
-    // printf("\nRandom permutation: ");
-    // for (int i = 0; i < C1.n; ++i) {
-    //     printf("%lu ", J[i]);
-    // }
-    // printf("\n");
+    if (PRINT) {
+        printf("\nHash:\n\n");
+        bool_mat_print(bin_hash);
+        
+        printf("\nRandom permutation: ");
+        for (int i = 0; i < C1.n; ++i) {
+            printf("%lu ", J[i]);
+        }
+        printf("\n");
+    }
 
     bool_mat_t G_star;
     bool_mat_init(G_star, C1.k, C_A.n);
@@ -110,8 +114,10 @@ void generate_signature(const unsigned char *message, const unsigned long messag
     bool_mat_clear(G1);
     bool_mat_clear(G2);
 
-    // printf("\nCombined matrix, G*:\n\n");
-    // bool_mat_print(G_star);
+    if (PRINT) {
+        printf("\nCombined matrix, G*:\n\n");
+        bool_mat_print(G_star);
+    }
 
     bool_mat_t G_star_T;
     bool_mat_init(G_star_T, C_A.n, C1.k);
@@ -140,8 +146,11 @@ void verify_signature(const unsigned char *message, const unsigned int message_l
         int val =  hash[i % sizeof(hash)] % 2;
         bool_mat_set_entry(hash_T, i, 0, val);
     }
-    // printf("\nHash:\n\n");
-    // bool_mat_print(hash_T);
+    
+    if (PRINT) {
+        printf("\nHash:\n\n");
+        bool_mat_print(hash_T);
+    }
 
     bool_mat_t left; 
     bool_mat_init(left, F_rows, 1);
@@ -176,30 +185,34 @@ int main(void) {
         exit(EXIT_FAILURE);
     }
 
-    int m = 12;
+    int m = 4;
 
     printf("\n-----------Key Generation-----------\n");
     struct code C_A = {pow(2, m) - 1, pow(2, m) - m - 1, m};
     bool_mat_t H_A;
     bool_mat_init(H_A, C_A.t, C_A.n);
     generate_parity_check_matrix(C_A.n, C_A.k, H_A);
-    // printf("\nParity check matrix, H_A:\n\n");
-    // bool_mat_print(H_A);
 
     struct code C1 = {C_A.n / 2, C_A.n / 2 - C_A.t + 1, C_A.t - 1};
     bool_mat_t G1;
     bool_mat_init(G1, C1.k, C1.n);
     create_generator_matrix(C1.n, C1.k, G1, false);
-    // printf("\nGenerator matrix, G1:\n\n");
-    // bool_mat_print(G1);
     
     struct code C2 = {C_A.n / 2 + 1, C_A.n / 2 - C_A.t + 1, C_A.t};
     bool_mat_t G2;
     bool_mat_init(G2, C2.k, C2.n);
     create_generator_matrix(C2.n, C2.k, G2, true);
-    // printf("\nGenerator matrix, G2:\n\n");
-    // bool_mat_print(G2);
+    
 
+    if (PRINT) {
+        printf("\nParity check matrix, H_A:\n\n");
+        bool_mat_print(H_A);
+        printf("\nGenerator matrix, G1:\n\n");
+        bool_mat_print(G1);
+        printf("\nGenerator matrix, G2:\n\n");
+        bool_mat_print(G2);
+    }
+ 
     unsigned char *message = calloc(C1.k, sizeof(unsigned char));
     const unsigned long message_len = C1.k;
 
@@ -212,10 +225,12 @@ int main(void) {
 
     generate_signature(message, message_len, C_A, C1, C2, H_A, G1, G2, F, signature);
     
-    // printf("\nPublic Key, F:\n\n");
-    // bool_mat_print(F);
-    // printf("\nSignature:\n\n");
-    // bool_mat_print(signature);
+    if (PRINT) {
+        printf("\nPublic Key, F:\n\n");
+        bool_mat_print(F);
+        printf("\nSignature:\n\n");
+        bool_mat_print(signature);
+    }
 
     printf("\n-----------Verification-----------\n");
     verify_signature(message, message_len, C_A.n, signature, C_A.t, C1.k, F, C_A, H_A);
