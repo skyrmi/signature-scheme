@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <stdbool.h>
 #include <math.h>
 #include <sodium.h>
@@ -38,8 +40,8 @@ void create_generator_matrix(unsigned long n, unsigned long k, nmod_mat_t G, boo
     make_systematic(n, k, H);
 
     nmod_mat_zero(G);
-    for (size_t i = 0; i < n - k; ++i) {
-        for (size_t j = 0; j < k; ++j) {
+    for (size_t i = 0; i < k; ++i) {
+        for (size_t j = 0; j < n; ++j) {
             if (i == j) {
                 nmod_mat_set_entry(G, i, j, 1);
             }
@@ -182,93 +184,81 @@ void verify_signature(const unsigned char *message, const unsigned int message_l
     nmod_mat_clear(right);
 }
 
-// Helper function to check if a vector is in the span of a matrix
-int is_in_span(const nmod_mat_t A, const nmod_mat_t b) {
-    nmod_mat_t x;
-    nmod_mat_init(x, b->c, 1, MOD);
-    int in_span = nmod_mat_can_solve(x, A, b);
-    nmod_mat_clear(x);
-    return in_span;
-}
-
-// Helper function to check if a vector is within Hamming distance t of any vector in the span
-int is_within_distance(const nmod_mat_t matrix, const nmod_mat_t vector, slong t) {
-    nmod_mat_t temp, diff;
-    nmod_mat_init(temp, 1, matrix->c, MOD);
-    nmod_mat_init(diff, 1, matrix->c, MOD);
-    
-    for (slong i = 0; i < (1L << matrix->r); i++) {
-        nmod_mat_zero(temp);
-        for (slong j = 0; j < matrix->r; j++) {
-            if (i & (1L << j)) {
-                for (slong k = 0; k < matrix->c; k++) {
-                    nmod_mat_set_entry(temp, 0, k, 
-                        nmod_mat_get_entry(temp, 0, k) ^ nmod_mat_get_entry(matrix, j, k));
-                }
-            }
-        }
-        
-        // XOR the result with the vector
-        for (slong k = 0; k < matrix->c; k++) {
-            nmod_mat_set_entry(diff, 0, k,
-                nmod_mat_get_entry(temp, 0, k) ^ nmod_mat_get_entry(vector, 0, k));
-        }
-        
-        slong distance = 0;
-        for (slong k = 0; k < matrix->c; k++) {
-            if (nmod_mat_get_entry(diff, 0, k)) {
-                distance++;
-            }
-        }
-        
-        if (distance < t) {
-            nmod_mat_clear(temp);
-            nmod_mat_clear(diff);
-            return 1;
-        }
+int get_distance_from_executable(nmod_mat_t gen_matrix) {
+    FILE *temp_file = fopen("temp_matrix.txt", "w");
+    if (temp_file == NULL) {
+        fprintf(stderr, "Error: Unable to create temporary file\n");
+        exit(1);
     }
-    
-    nmod_mat_clear(temp);
-    nmod_mat_clear(diff);
-    return 0;
+
+    fprintf(temp_file, "%d %d\n", gen_matrix->r, gen_matrix->c);
+    for (size_t i = 0; i < gen_matrix->r; ++i) {
+        for (size_t j = 0; j < gen_matrix->c; ++j) {
+            printf(" %d", nmod_mat_get_entry(gen_matrix, i, j));
+        }
+        printf("\n");
+    }
+    fclose(temp_file);
+
+    FILE *fp = popen("./testdistance temp_matrix.txt", "r");
+    if (fp == NULL) {
+        fprintf(stderr, "Error: Failed to run command\n");
+        exit(1);
+    }
+
+    if (fseek(fp, -128, SEEK_END) != 0) {
+        rewind(fp);
+    }
+
+    char buffer[128];
+    char last_line[128] = "";
+    char second_last_line[128] = "";
+
+    while (fgets(buffer, sizeof(buffer), fp) != NULL) {
+        strcpy(last_line, second_last_line);
+        strcpy(second_last_line, buffer);
+    }
+
+    pclose(fp);
+
+    int distance = 0;
+    if (sscanf(second_last_line, "Distance of input matrix: %ld", &distance) != 1) {
+        fprintf(stderr, "Error: Unable to parse distance from output\n");
+        exit(1);
+    }
+
+    return distance;
 }
 
-void create_general_generator_matrix(nmod_mat_t gen_matrix, slong n, slong t) {
-    nmod_mat_init(gen_matrix, 0, n, MOD);
-    
-    nmod_mat_t vector;
-    nmod_mat_init(vector, 1, n, MOD);
-    
-    for (slong i = 1; i < (1L << n); i++) {
-        for (slong j = 0; j < n; j++) {
-            // nmod_mat_set_entry(vector, 0, j, (i >> j) & 1);
-            nmod_mat_set_entry(vector, 0, j, randombytes_uniform(2));
-        }
-        
-        if ((!is_in_span(gen_matrix, vector) && !is_within_distance(gen_matrix, vector, t))) {
-            nmod_mat_t temp_matrix;
-            nmod_mat_init(temp_matrix, gen_matrix->r + 1, n, MOD);
-            nmod_mat_set(temp_matrix, gen_matrix);
+void create_generator_matrix(nmod_mat_t gen_matrix, slong n, slong k, slong d) {
+    // Initialize the generator matrix with [I_k | 0]
+    nmod_mat_init(gen_matrix, k, n);
+    for (size_t i = 0; i < k; i++) {
+        nmod_mat_set_entry(gen_matrix, i, i, 1); 
+    }
 
-            for (slong j = 0; j < n; j++) {
-                nmod_mat_set_entry(temp_matrix, gen_matrix->r, j, nmod_mat_get_entry(vector, 0, j));
-            }
+    int current_best_distance = 2; 
+    slong gray = 0;
+    for (slong i = 0; i < (1L << (k * (n - k))); i++) {
+        // Update only the bits that changed in the Gray code
+        slong changed_bit = gray ^ (gray >> 1) ^ i;
+        slong row = (changed_bit / (n - k)) % k;
+        slong col = changed_bit % (n - k);
+        nmod_mat_set_entry(gen_matrix, row, k+col, !nmod_mat_get_entry(gen_matrix, row, k+col));
+        
+        // Compute minimum distance using the external executable
+        int current_distance = get_distance_from_executable(gen_matrix);
+        
+        if (current_distance > current_best_distance) {
+            current_best_distance = current_distance;
             
-            nmod_mat_clear(gen_matrix);
-            nmod_mat_swap(gen_matrix, temp_matrix);
-            // nmod_mat_clear(temp_matrix);
-        }   
-        
-        if (gen_matrix->r == n) {
-            break;
+            if (current_best_distance >= d) {
+                break;
+            }
         }
+        gray = i;  
     }
-    
-    nmod_mat_clear(vector);
-    nmod_mat_rref(gen_matrix);
-    // make_systematic(gen_matrix->c, gen_matrix->r, gen_matrix);
 }
-
 
 int main(void) {
     if (sodium_init() < 0) {
@@ -277,7 +267,7 @@ int main(void) {
     }
 
     nmod_mat_t gen_matrix;
-    slong n = 23;  // dimension of the code
+    slong n = 15;  // dimension of the code
     slong t = 7;   // minimum distance - 1
     create_general_generator_matrix(gen_matrix, n, t);
     nmod_mat_print(gen_matrix);
