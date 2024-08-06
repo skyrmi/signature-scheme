@@ -1,6 +1,7 @@
 #include <stdio.h>
+#include <sodium.h>
 #include <flint/flint.h>
-#include <flint/bool_mat.h>
+#include <flint/nmod_mat.h>
 
 void print_matrix(int rows, int cols, int matrix[rows][cols], const char *label) {
     printf("\n%s\n", label);
@@ -20,29 +21,29 @@ void transpose_matrix(int rows, int cols, int matrix[rows][cols], int transpose[
     }
 }
 
-void multiply_matrices_gf2(bool_mat_t C, bool_mat_t A, bool_mat_t B) {
+void multiply_matrices_gf2(nmod_mat_t C, const nmod_mat_t A, const nmod_mat_t B) {
     for (size_t i = 0; i < A->r; i++) {
         for (size_t j = 0; j < B->c; j++) {
-            bool_mat_set_entry(C, i, j, 0);
+            nmod_mat_set_entry(C, i, j, 0);
 
-            for (size_t k = 0; k < A->c; k++) {
-                int temp = bool_mat_get_entry(C, i, j);
-                temp ^= (bool_mat_get_entry(A, i, k) & bool_mat_get_entry(B, k, j));  
-                bool_mat_set_entry(C, i, j, temp);
+            for (size_t k = 0; k < B->r; k++) {
+                int temp = nmod_mat_get_entry(C, i, j);
+                temp ^= (nmod_mat_get_entry(A, i, k) & nmod_mat_get_entry(B, k, j));  
+                nmod_mat_set_entry(C, i, j, temp);
             }
         }
     }
 }
 
-static void swap_columns(size_t n, size_t k, size_t first, size_t second, bool_mat_t H) {
+static void swap_columns(size_t n, size_t k, size_t first, size_t second, nmod_mat_t H) {
     for (size_t i = 0; i < n - k; ++i) {
-        int temp = bool_mat_get_entry(H, i, first);
-        bool_mat_set_entry(H, i, first, bool_mat_get_entry(H, i, second));
-        bool_mat_set_entry(H, i, second, temp);
+        int temp = nmod_mat_get_entry(H, i, first);
+        nmod_mat_set_entry(H, i, first, nmod_mat_get_entry(H, i, second));
+        nmod_mat_set_entry(H, i, second, temp);
     }
 }
 
-void make_systematic(size_t n, size_t k, bool_mat_t H) {
+void make_systematic(size_t n, size_t k, nmod_mat_t H) {
     size_t r = n - k;
     unsigned long sum, position, count = 0;
 
@@ -50,7 +51,7 @@ void make_systematic(size_t n, size_t k, bool_mat_t H) {
         sum = position = 0;
 
         for (size_t j = 0; j < r; ++j) {
-            if (bool_mat_get_entry(H, j, i) == 1) {
+            if (nmod_mat_get_entry(H, j, i) == 1) {
                 position = j;
                 sum += 1;
             }
