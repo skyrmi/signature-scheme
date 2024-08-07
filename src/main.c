@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <stdbool.h>
 #include <math.h>
 #include <sodium.h>
@@ -14,54 +16,132 @@ struct code {
     unsigned long n, k, t;
 };
 
-void generate_parity_check_matrix(unsigned long n, unsigned long k, nmod_mat_t H) {
-    int r = n - k;
-    
-    nmod_mat_zero(H);
-    
-    for (size_t i = 0; i < r; ++i) {
-        for (size_t j = 0; j < n; ++j) {
-            // set to 1 if ith parity bit is set
-            if (((j + 1) & (1 << i)) != 0) {
-                nmod_mat_set_entry(H, i, j, 1);
-            }
-        }
+// Check if a vector is in the span of a matrix 
+int is_in_span(const nmod_mat_t A, const nmod_mat_t b) { 
+    nmod_mat_t x; 
+    nmod_mat_init(x, b->c, 1, MOD); 
+    int in_span = nmod_mat_can_solve(x, A, b); 
+    nmod_mat_clear(x); return in_span; 
+} 
+
+// Check if a vector is in the Ball2(n, d-1) 
+bool is_in_ball(const nmod_mat_t v, slong n, slong d) { 
+    slong weight = 0; 
+    for (slong i = 0; i < n; i++) { 
+        weight += nmod_mat_get_entry(v, 0, i); 
+    } 
+    return weight < d; 
+} 
+
+// Minimum distance of matrix using Brouwer-Zimmermann
+int get_distance_from_executable(nmod_mat_t gen_matrix) {
+    FILE *temp_file = fopen("temp_matrix.txt", "w");
+    if (temp_file == NULL) {
+        fprintf(stderr, "Error: Unable to create temporary file\n");
+        exit(1);
     }
+
+    fprintf(temp_file, "%ld %ld\n", gen_matrix->r, gen_matrix->c);
+    for (size_t i = 0; i < gen_matrix->r; ++i) {
+        for (size_t j = 0; j < gen_matrix->c; ++j) {
+            fprintf(temp_file, " %ld", nmod_mat_get_entry(gen_matrix, i, j));
+        }
+        fprintf(temp_file, "\n");
+    }
+    fclose(temp_file);
+
+    FILE *fp = popen("test_distance temp_matrix.txt", "r");
+    if (fp == NULL) {
+        fprintf(stderr, "Error: Failed to run command\n");
+        exit(1);
+    }
+
+    if (fseek(fp, -128, SEEK_END) != 0) {
+        rewind(fp);
+    }
+
+    char buffer[128];
+    char last_line[128] = "";
+    char second_last_line[128] = "";
+
+    while (fgets(buffer, sizeof(buffer), fp) != NULL) {
+        strcpy(last_line, second_last_line);
+        strcpy(second_last_line, buffer);
+    }
+
+    pclose(fp);
+
+    int distance = 0;
+    if (sscanf(last_line, "Distance of input matrix: %d", &distance) != 1) {
+        fprintf(stderr, "Error: Unable to parse distance from output\n");
+        exit(1);
+    }
+
+    return distance;
 }
 
-// Convert parity check matrix to systematic form and create generator
-void create_generator_matrix(unsigned long n, unsigned long k, nmod_mat_t G, bool extended) {
-    nmod_mat_t H;
-    nmod_mat_init(H, n - k, n, MOD);
+void create_generator_matrix(nmod_mat_t gen_matrix, slong n, slong k, slong d) { 
+    // Initialize the generator matrix with [I_k | 0]
+    nmod_mat_init(gen_matrix, k, n, MOD);
 
-    generate_parity_check_matrix(n, k, H);    
-    make_systematic(n, k, H);
+    nmod_mat_t v;
+    nmod_mat_init(v, 1, n, MOD);
 
-    nmod_mat_zero(G);
-    for (size_t i = 0; i < n - k; ++i) {
-        for (size_t j = 0; j < k; ++j) {
-            if (i == j) {
-                nmod_mat_set_entry(G, i, j, 1);
+    for (slong current_row = 0; current_row < k; current_row++) { 
+        // Set the identity part 
+        for (slong i = 0; i < k; i++) { 
+            nmod_mat_set_entry(v, 0, i, (i == current_row) ? 1 : 0); 
+        } 
+        
+        // Find a suitable vector for the remaining n-k elements 
+        bool found = false; 
+        for (slong i = 0; i < (1L << (n - k)); i++) { 
+            for (slong j = 0; j < n - k; j++) { 
+                nmod_mat_set_entry(v, 0, k + j, randombytes_uniform(MOD)); 
+            }
+
+            if (!is_in_ball(v, n, d)) {
+                // Add v to generator matrix 
+                for (slong j = 0; j < n; ++j) {
+                    nmod_mat_set_entry(gen_matrix, current_row, j, nmod_mat_get_entry(v, 0, j));
+                }
+
+                // Check if code has minimum distance d
+                int min_distance = get_distance_from_executable(gen_matrix);
+                if (min_distance >= d) {
+                    found = true;
+                    break;
+                }
             }
         }
-    }
+
+        if (!found) {
+            printf("Failed to find a suitable vector for row %ld\n", current_row);
+            nmod_mat_clear(v);
+            return;
+        } 
+    } 
+    nmod_mat_clear(v);
+}
+
+void generate_parity_check_matrix(unsigned long n, unsigned long k, unsigned long d, nmod_mat_t H) {
+    nmod_mat_t G;
+    nmod_mat_init (G, k, n, MOD);
+    create_generator_matrix(G, n, k, d);
+    
+    nmod_mat_zero(H);
 
     for (size_t i = 0; i < n - k; ++i) {
         for (size_t j = 0; j < k; ++j) {
-            nmod_mat_set_entry(G, j, k + i, nmod_mat_get_entry(H, i, j));
+            nmod_mat_set_entry(H, i, j, nmod_mat_get_entry(G, j, k + i));
         }
     }
-    nmod_mat_clear(H);
 
-    if (extended) {
-        for (size_t i = 0; i < k; ++i) {
-            int xor_sum = 0;
-            for (size_t j = 0; j < n; ++j) {
-                xor_sum ^= nmod_mat_get_entry(G, i, j);
-            }
-            nmod_mat_set_entry(G, i, n - 1, xor_sum);
-        }
+    for (size_t i = 0; i < n - k; ++i) {
+        nmod_mat_set_entry(H, i, k + i, 1);
     }
+
+    nmod_mat_clear(G);
 }
 
 void generate_signature(const unsigned char *message, const unsigned long message_len, 
@@ -182,104 +262,19 @@ void verify_signature(const unsigned char *message, const unsigned int message_l
     nmod_mat_clear(right);
 }
 
-// Helper function to check if a vector is in the span of a matrix
-int is_in_span(const nmod_mat_t A, const nmod_mat_t b) {
-    nmod_mat_t x;
-    nmod_mat_init(x, b->c, 1, MOD);
-    int in_span = nmod_mat_can_solve(x, A, b);
-    nmod_mat_clear(x);
-    return in_span;
-}
-
-// Helper function to check if a vector is within Hamming distance t of any vector in the span
-int is_within_distance(const nmod_mat_t matrix, const nmod_mat_t vector, slong t) {
-    nmod_mat_t temp, diff;
-    nmod_mat_init(temp, 1, matrix->c, MOD);
-    nmod_mat_init(diff, 1, matrix->c, MOD);
-    
-    for (slong i = 0; i < (1L << matrix->r); i++) {
-        nmod_mat_zero(temp);
-        for (slong j = 0; j < matrix->r; j++) {
-            if (i & (1L << j)) {
-                for (slong k = 0; k < matrix->c; k++) {
-                    nmod_mat_set_entry(temp, 0, k, 
-                        nmod_mat_get_entry(temp, 0, k) ^ nmod_mat_get_entry(matrix, j, k));
-                }
-            }
-        }
-        
-        // XOR the result with the vector
-        for (slong k = 0; k < matrix->c; k++) {
-            nmod_mat_set_entry(diff, 0, k,
-                nmod_mat_get_entry(temp, 0, k) ^ nmod_mat_get_entry(vector, 0, k));
-        }
-        
-        slong distance = 0;
-        for (slong k = 0; k < matrix->c; k++) {
-            if (nmod_mat_get_entry(diff, 0, k)) {
-                distance++;
-            }
-        }
-        
-        if (distance < t) {
-            nmod_mat_clear(temp);
-            nmod_mat_clear(diff);
-            return 1;
-        }
-    }
-    
-    nmod_mat_clear(temp);
-    nmod_mat_clear(diff);
-    return 0;
-}
-
-void create_general_generator_matrix(nmod_mat_t gen_matrix, slong n, slong t) {
-    nmod_mat_init(gen_matrix, 0, n, MOD);
-    
-    nmod_mat_t vector;
-    nmod_mat_init(vector, 1, n, MOD);
-    
-    for (slong i = 1; i < (1L << n); i++) {
-        for (slong j = 0; j < n; j++) {
-            // nmod_mat_set_entry(vector, 0, j, (i >> j) & 1);
-            nmod_mat_set_entry(vector, 0, j, randombytes_uniform(2));
-        }
-        
-        if ((!is_in_span(gen_matrix, vector) && !is_within_distance(gen_matrix, vector, t))) {
-            nmod_mat_t temp_matrix;
-            nmod_mat_init(temp_matrix, gen_matrix->r + 1, n, MOD);
-            nmod_mat_set(temp_matrix, gen_matrix);
-
-            for (slong j = 0; j < n; j++) {
-                nmod_mat_set_entry(temp_matrix, gen_matrix->r, j, nmod_mat_get_entry(vector, 0, j));
-            }
-            
-            nmod_mat_clear(gen_matrix);
-            nmod_mat_swap(gen_matrix, temp_matrix);
-            // nmod_mat_clear(temp_matrix);
-        }   
-        
-        if (gen_matrix->r == n) {
-            break;
-        }
-    }
-    
-    nmod_mat_clear(vector);
-    nmod_mat_rref(gen_matrix);
-    // make_systematic(gen_matrix->c, gen_matrix->r, gen_matrix);
-}
-
-
-int main(void) {
-    if (sodium_init() < 0) {
+int main(void)
+{
+    if (sodium_init() < 0)
+    {
         fprintf(stderr, "sodium-init failed\n");
         exit(EXIT_FAILURE);
     }
 
     nmod_mat_t gen_matrix;
-    slong n = 23;  // dimension of the code
-    slong t = 7;   // minimum distance - 1
-    create_general_generator_matrix(gen_matrix, n, t);
+    slong n = 15;
+    slong k = 11;
+    slong d = 1; 
+    create_generator_matrix(gen_matrix, n, k, d);
     nmod_mat_print(gen_matrix);
     nmod_mat_clear(gen_matrix);
 
@@ -289,18 +284,17 @@ int main(void) {
     struct code C_A = {pow(2, m) - 1, pow(2, m) - m - 1, m};
     nmod_mat_t H_A;
     nmod_mat_init(H_A, C_A.t, C_A.n, MOD);
-    generate_parity_check_matrix(C_A.n, C_A.k, H_A);
+    generate_parity_check_matrix(C_A.n, C_A.k, 1, H_A);
 
     struct code C1 = {C_A.n / 2, C_A.n / 2 - C_A.t + 1, C_A.t - 1};
     nmod_mat_t G1;
     nmod_mat_init(G1, C1.k, C1.n, MOD);
-    create_generator_matrix(C1.n, C1.k, G1, false);
-    
+    create_generator_matrix(G1, C1.n, C1.k, 1);
+
     struct code C2 = {C_A.n / 2 + 1, C_A.n / 2 - C_A.t + 1, C_A.t};
     nmod_mat_t G2;
     nmod_mat_init(G2, C2.k, C2.n, MOD);
-    create_generator_matrix(C2.n, C2.k, G2, true);
-    
+    create_generator_matrix(G2, C2.n, C2.k, 1);
 
     if (PRINT) {
         printf("\nParity check matrix, H_A:\n\n");
@@ -310,7 +304,7 @@ int main(void) {
         printf("\nGenerator matrix, G2:\n\n");
         nmod_mat_print(G2);
     }
- 
+
     unsigned char *message = calloc(C1.k, sizeof(unsigned char));
     const unsigned long message_len = C1.k;
 
@@ -322,7 +316,7 @@ int main(void) {
     nmod_mat_init(signature, 1, C_A.n, MOD);
 
     generate_signature(message, message_len, C_A, C1, C2, H_A, G1, G2, F, signature);
-    
+
     if (PRINT) {
         printf("\nPublic Key, F:\n\n");
         nmod_mat_print(F);
