@@ -55,6 +55,7 @@ int get_distance_from_executable(nmod_mat_t gen_matrix) {
         fprintf(stderr, "Error: Failed to run command\n");
         exit(1);
     }
+    // printf("End dist comp\n");
 
     if (fseek(fp, -128, SEEK_END) != 0) {
         rewind(fp);
@@ -95,9 +96,10 @@ void create_generator_matrix(nmod_mat_t gen_matrix, slong n, slong k, slong d) {
         
         // Find a suitable vector for the remaining n-k elements 
         bool found = false; 
-        for (slong i = 0; i < (1L << (n - k)); i++) { 
-            for (slong j = 0; j < n - k; j++) { 
-                nmod_mat_set_entry(v, 0, k + j, randombytes_uniform(MOD)); 
+        for (slong i = 0; i < (1L << (n-k)); i++) { 
+            for (slong j = 0; j < n-k; j++) { 
+                // nmod_mat_set_entry(v, 0, k+j, (i >> j) & 1);
+                nmod_mat_set_entry(v, 0, k+j, randombytes_uniform(MOD)); 
             }
 
             if (!is_in_ball(v, n, d)) {
@@ -262,6 +264,30 @@ void verify_signature(const unsigned char *message, const unsigned int message_l
     nmod_mat_clear(right);
 }
 
+void combine_generator_matrices(nmod_mat_t G1, nmod_mat_t G2) {
+    slong k = G1->r;
+    slong n1 = G1->c;
+    slong n2 = G2->c;
+
+    nmod_mat_t G;
+    nmod_mat_init(G, k, n1 + n2, MOD);
+
+    for (slong i = 0; i < k; ++i) {
+        for (slong j = 0; j < n1; ++j) {
+            nmod_mat_set_entry(G, i, j, nmod_mat_get_entry(G1, i, j));
+        }
+        for (slong j = 0; j < n2; ++j) {
+            nmod_mat_set_entry(G, i, n1 + j, nmod_mat_get_entry(G2, i, j));
+        }
+    }
+
+    nmod_mat_rref(G);
+    printf("\nCombined generator G*:\n\n");
+    nmod_mat_print_pretty(G);
+    printf("\nDistance of direct combination: %d\n", get_distance_from_executable(G));
+    nmod_mat_clear(G);
+}
+
 int main(void)
 {
     if (sodium_init() < 0)
@@ -270,13 +296,14 @@ int main(void)
         exit(EXIT_FAILURE);
     }
 
-    nmod_mat_t gen_matrix;
-    slong n = 15;
-    slong k = 11;
-    slong d = 1; 
-    create_generator_matrix(gen_matrix, n, k, d);
-    nmod_mat_print(gen_matrix);
-    nmod_mat_clear(gen_matrix);
+    // sample generator construction
+    // nmod_mat_t gen_matrix;
+    // slong n = 40;
+    // slong k = 20;
+    // slong t = 6; 
+    // create_generator_matrix(gen_matrix, n, k, t);
+    // nmod_mat_print(gen_matrix);
+    // nmod_mat_clear(gen_matrix);
 
     int m = 5;
 
@@ -286,15 +313,15 @@ int main(void)
     nmod_mat_init(H_A, C_A.t, C_A.n, MOD);
     generate_parity_check_matrix(C_A.n, C_A.k, 1, H_A);
 
-    struct code C1 = {C_A.n / 2, C_A.n / 2 - C_A.t + 1, C_A.t - 1};
+    struct code C1 = {153, 20, 50};
     nmod_mat_t G1;
     nmod_mat_init(G1, C1.k, C1.n, MOD);
-    create_generator_matrix(G1, C1.n, C1.k, 1);
+    create_generator_matrix(G1, C1.n, C1.k, C1.t);
 
-    struct code C2 = {C_A.n / 2 + 1, C_A.n / 2 - C_A.t + 1, C_A.t};
+    struct code C2 = {160, 40, 37};
     nmod_mat_t G2;
     nmod_mat_init(G2, C2.k, C2.n, MOD);
-    create_generator_matrix(G2, C2.n, C2.k, 1);
+    create_generator_matrix(G2, C2.n, C2.k, C2.t);
 
     if (PRINT) {
         printf("\nParity check matrix, H_A:\n\n");
@@ -304,6 +331,8 @@ int main(void)
         printf("\nGenerator matrix, G2:\n\n");
         nmod_mat_print(G2);
     }
+
+    combine_generator_matrices(G1, G2);
 
     unsigned char *message = calloc(C1.k, sizeof(unsigned char));
     const unsigned long message_len = C1.k;
