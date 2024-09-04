@@ -144,6 +144,7 @@ void generate_parity_check_matrix(unsigned long n, unsigned long k, unsigned lon
         nmod_mat_set_entry(H, i, k + i, 1);
     }
 
+    printf("Done\n");
     nmod_mat_clear(G);
 }
 
@@ -297,7 +298,7 @@ int main(void)
     printf("\n-----------Key Generation-----------\n");
     struct code C_A = {get_H_A_n(), get_H_A_k(), get_H_A_d()};
     nmod_mat_t H_A;
-    nmod_mat_init(H_A, C_A.t, C_A.n, MOD);
+    nmod_mat_init(H_A, C_A.n - C_A.k, C_A.n, MOD);
     generate_parity_check_matrix(C_A.n, C_A.k, C_A.t, H_A);
 
     struct code C1 = {get_G1_n(), get_G1_k(), get_G1_d()};
