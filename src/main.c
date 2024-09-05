@@ -131,9 +131,7 @@ void create_generator_matrix(nmod_mat_t gen_matrix, slong n, slong k, slong d, F
 void generate_parity_check_matrix(unsigned long n, unsigned long k, unsigned long d, nmod_mat_t H, FILE *output_file) {
     nmod_mat_t G;
     nmod_mat_init (G, k, n, MOD);
-    printf("hi parity before gen\n");
     create_generator_matrix(G, n, k, d, output_file);
-    printf("hi parity after gen\n");
     
     nmod_mat_zero(H);
 
@@ -215,9 +213,6 @@ void generate_signature(unsigned char hash[], long long hash_size, size_t messag
     nmod_mat_transpose(G_star_T, G_star);
 
     nmod_mat_mul(F, H_A, G_star_T);
-
-    // printf("signature: %ld, %ld, bin_hash: %ld %ld, G_star: %ld %ld\n", signature->r, signature->c, bin_hash->r, bin_hash->c, G_star->r, G_star->c);
-    // printf("hi\n");
     nmod_mat_mul(signature, bin_hash, G_star);
 
     nmod_mat_clear(G_star);
@@ -292,7 +287,6 @@ void combine_generator_matrices(nmod_mat_t G1, nmod_mat_t G2, FILE* output_file)
 
 int main(void)
 {
-    // Get parameters
     Params g1, g2;
     char *msg;
     size_t message_len;
@@ -302,7 +296,6 @@ int main(void)
 
     FILE *output_file = fopen(OUTPUT_PATH, "w");
 
-    printf("hi\n");
     fprintf(output_file, "\n-----------Key Generation-----------\n");
     struct code C_A = {get_H_A_n(), get_H_A_k(), get_H_A_d()};
     nmod_mat_t H_A;

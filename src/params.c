@@ -111,7 +111,7 @@ void get_user_input(Params *g1, Params *g2, char **message, size_t *message_len)
             exit(1);
         }
         strcpy(*message, random_message);
-        printf("Default message used.\n");
+        printf("Random message used.\n");
     }
 
     G1 = *g1;
