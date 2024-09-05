@@ -3,13 +3,15 @@
 #include <flint/flint.h>
 #include <flint/nmod_mat.h>
 
-void print_matrix(int rows, int cols, int matrix[rows][cols], const char *label) {
-    printf("\n%s\n", label);
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-            printf("%d ", matrix[i][j]);
+void print_matrix(FILE *fp, nmod_mat_t matrix) {
+    fprintf(fp, "<%ld x %ld matrix>\n", matrix->r, matrix->c);
+    for (int i = 0; i < matrix->r; i++) {
+        fprintf(fp, "[ ");
+        for (int j = 0; j < matrix->c; j++) {
+            fprintf(fp, "%ld ", nmod_mat_get_entry(matrix, i, j));
         }
-        printf("\n");
+        fprintf(fp, "]");
+        fprintf(fp, "\n");
     }
 }
 

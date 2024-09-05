@@ -8,9 +8,11 @@
 #include <flint/nmod_mat.h>
 #include "matrix.h"
 #include "utils.h"
+#include "params.h"
 
 #define PRINT true
 #define MOD 2
+#define OUTPUT_PATH "output.txt"
 
 struct code {
     unsigned long n, k, t;
@@ -21,7 +23,8 @@ int is_in_span(const nmod_mat_t A, const nmod_mat_t b) {
     nmod_mat_t x; 
     nmod_mat_init(x, b->c, 1, MOD); 
     int in_span = nmod_mat_can_solve(x, A, b); 
-    nmod_mat_clear(x); return in_span; 
+    nmod_mat_clear(x); 
+    return in_span; 
 } 
 
 // Check if a vector is in the Ball2(n, d-1) 
@@ -80,7 +83,7 @@ int get_distance_from_executable(nmod_mat_t gen_matrix) {
     return distance;
 }
 
-void create_generator_matrix(nmod_mat_t gen_matrix, slong n, slong k, slong d) { 
+void create_generator_matrix(nmod_mat_t gen_matrix, slong n, slong k, slong d, FILE *output_file) { 
     // Initialize the generator matrix with [I_k | 0]
     nmod_mat_init(gen_matrix, k, n, MOD);
 
@@ -95,9 +98,10 @@ void create_generator_matrix(nmod_mat_t gen_matrix, slong n, slong k, slong d) {
         
         // Find a suitable vector for the remaining n-k elements 
         bool found = false; 
-        for (slong i = 0; i < (1L << (n - k)); i++) { 
-            for (slong j = 0; j < n - k; j++) { 
-                nmod_mat_set_entry(v, 0, k + j, randombytes_uniform(MOD)); 
+        for (slong i = 0; i < (1L << (n-k)); i++) { 
+            for (slong j = 0; j < n-k; j++) { 
+                // nmod_mat_set_entry(v, 0, k+j, (i >> j) & 1);
+                nmod_mat_set_entry(v, 0, k+j, randombytes_uniform(MOD)); 
             }
 
             if (!is_in_ball(v, n, d)) {
@@ -116,7 +120,7 @@ void create_generator_matrix(nmod_mat_t gen_matrix, slong n, slong k, slong d) {
         }
 
         if (!found) {
-            printf("Failed to find a suitable vector for row %ld\n", current_row);
+            fprintf(output_file, "Failed to find a suitable vector for row %ld\n", current_row);
             nmod_mat_clear(v);
             return;
         } 
@@ -124,10 +128,10 @@ void create_generator_matrix(nmod_mat_t gen_matrix, slong n, slong k, slong d) {
     nmod_mat_clear(v);
 }
 
-void generate_parity_check_matrix(unsigned long n, unsigned long k, unsigned long d, nmod_mat_t H) {
+void generate_parity_check_matrix(unsigned long n, unsigned long k, unsigned long d, nmod_mat_t H, FILE *output_file) {
     nmod_mat_t G;
     nmod_mat_init (G, k, n, MOD);
-    create_generator_matrix(G, n, k, d);
+    create_generator_matrix(G, n, k, d, output_file);
     
     nmod_mat_zero(H);
 
@@ -140,22 +144,19 @@ void generate_parity_check_matrix(unsigned long n, unsigned long k, unsigned lon
     for (size_t i = 0; i < n - k; ++i) {
         nmod_mat_set_entry(H, i, k + i, 1);
     }
-
+    
     nmod_mat_clear(G);
 }
 
-void generate_signature(const unsigned char *message, const unsigned long message_len, 
+void generate_signature(unsigned char hash[], long long hash_size, size_t message_len,
     struct code C_A, struct code C1, struct code C2, 
     nmod_mat_t H_A, nmod_mat_t G1, nmod_mat_t G2, 
-    nmod_mat_t F, nmod_mat_t signature) {
-
-    unsigned char hash[crypto_generichash_BYTES];
-    crypto_generichash(hash, sizeof(hash), message, message_len, NULL, 0);
+    nmod_mat_t F, nmod_mat_t signature, FILE *output_file) {
 
     nmod_mat_t bin_hash;
     nmod_mat_init(bin_hash, 1, message_len, MOD);
     for (size_t i = 0; i < message_len; ++i) {
-        int val = hash[i % sizeof(hash)] % 2;
+        int val = hash[i % hash_size] % 2;
         nmod_mat_set_entry(bin_hash, 0, i, val);
     }
 
@@ -163,14 +164,14 @@ void generate_signature(const unsigned char *message, const unsigned long messag
     generate_random_set(C_A.n, C1.n, J);
 
     if (PRINT) {
-        printf("\nHash:\n\n");
-        nmod_mat_print(bin_hash);
+        fprintf(output_file, "\nHash:\n\n");
+        print_matrix(output_file, bin_hash);
         
-        printf("\nRandom permutation: ");
+        fprintf(output_file, "\nRandom permutation: ");
         for (int i = 0; i < C1.n; ++i) {
-            printf("%lu ", J[i]);
+            fprintf(output_file, "%lu ", J[i]);
         }
-        printf("\n");
+        fprintf(output_file, "\n");
     }
 
     nmod_mat_t G_star;
@@ -203,8 +204,8 @@ void generate_signature(const unsigned char *message, const unsigned long messag
     nmod_mat_clear(G2);
 
     if (PRINT) {
-        printf("\nCombined matrix, G*:\n\n");
-        nmod_mat_print(G_star);
+        fprintf(output_file, "\nCombined matrix, G*:\n\n");
+        print_matrix(output_file, G_star);
     }
 
     nmod_mat_t G_star_T;
@@ -219,42 +220,40 @@ void generate_signature(const unsigned char *message, const unsigned long messag
     nmod_mat_clear(bin_hash);
 }
 
-void verify_signature(const unsigned char *message, const unsigned int message_len,
-    unsigned long sig_len, nmod_mat_t signature, unsigned long F_rows, unsigned long F_cols, nmod_mat_t F,
-    struct code C_A, nmod_mat_t H_A)  {
-
-    unsigned char hash[crypto_generichash_BYTES];
-    crypto_generichash(hash, sizeof(hash), message, message_len, NULL, 0);
+void verify_signature(unsigned char hash[], long long hash_size, size_t message_len,
+    unsigned long sig_len, nmod_mat_t signature, nmod_mat_t F,
+    struct code C_A, nmod_mat_t H_A, FILE *output_file)  {
     
     nmod_mat_t hash_T;
     nmod_mat_init(hash_T, message_len, 1, MOD);
     for (size_t i = 0; i < message_len; ++i) {
-        int val =  hash[i % sizeof(hash)] % 2;
+        int val =  hash[i % hash_size] % 2;
         nmod_mat_set_entry(hash_T, i, 0, val);
     }
     
     if (PRINT) {
-        printf("\nHash:\n\n");
-        nmod_mat_print(hash_T);
+        fprintf(output_file, "\nHash:\n\n");
+        print_matrix(output_file, hash_T);
     }
 
     nmod_mat_t left; 
-    nmod_mat_init(left, F_rows, 1, MOD);
+    nmod_mat_init(left, F->r, 1, MOD);
+
     nmod_mat_mul(left, F, hash_T);
-    printf("\nLHS:\n\n");
-    nmod_mat_print(left);
+    fprintf(output_file, "\nLHS:\n\n");
+    print_matrix(output_file, left);
 
     nmod_mat_t sig_T;
     nmod_mat_init(sig_T, sig_len, 1, MOD);
     nmod_mat_transpose(sig_T, signature);
 
     nmod_mat_t right;
-    nmod_mat_init(right, C_A.t, 1, MOD);
+    nmod_mat_init(right, C_A.n - C_A.k, 1, MOD);
     nmod_mat_mul(right, H_A, sig_T);
-    printf("\nRHS:\n\n");
-    nmod_mat_print(right);
+    fprintf(output_file, "\nRHS:\n\n");
+    print_matrix(output_file, right);
     
-    printf("\nVerified: %s", (nmod_mat_equal(left, right)) ? "True" : "False");
+    fprintf(output_file, "\nVerified: %s", (nmod_mat_equal(left, right)) ? "True" : "False");
 
     nmod_mat_clear(hash_T);
     nmod_mat_clear(left);
@@ -262,75 +261,94 @@ void verify_signature(const unsigned char *message, const unsigned int message_l
     nmod_mat_clear(right);
 }
 
+void combine_generator_matrices(nmod_mat_t G1, nmod_mat_t G2, FILE* output_file) {
+    slong k = G1->r;
+    slong n1 = G1->c;
+    slong n2 = G2->c;
+
+    nmod_mat_t G;
+    nmod_mat_init(G, k, n1 + n2, MOD);
+
+    for (slong i = 0; i < k; ++i) {
+        for (slong j = 0; j < n1; ++j) {
+            nmod_mat_set_entry(G, i, j, nmod_mat_get_entry(G1, i, j));
+        }
+        for (slong j = 0; j < n2; ++j) {
+            nmod_mat_set_entry(G, i, n1 + j, nmod_mat_get_entry(G2, i, j));
+        }
+    }
+
+    nmod_mat_rref(G);
+    fprintf(output_file, "\nCombined generator G*:\n\n");
+    print_matrix(output_file, G);
+    fprintf(output_file, "\nDistance of direct combination: %d\n", get_distance_from_executable(G));
+    nmod_mat_clear(G);
+}
+
 int main(void)
 {
-    if (sodium_init() < 0)
-    {
-        fprintf(stderr, "sodium-init failed\n");
-        exit(EXIT_FAILURE);
-    }
+    Params g1, g2;
+    char *msg;
+    size_t message_len;
 
-    nmod_mat_t gen_matrix;
-    slong n = 15;
-    slong k = 11;
-    slong d = 1; 
-    create_generator_matrix(gen_matrix, n, k, d);
-    nmod_mat_print(gen_matrix);
-    nmod_mat_clear(gen_matrix);
+    get_user_input(&g1, &g2, &msg, &message_len);
+    const unsigned char* message = get_MESSAGE();
 
-    int m = 5;
+    FILE *output_file = fopen(OUTPUT_PATH, "w");
 
-    printf("\n-----------Key Generation-----------\n");
-    struct code C_A = {pow(2, m) - 1, pow(2, m) - m - 1, m};
+    fprintf(output_file, "\n-----------Key Generation-----------\n");
+    struct code C_A = {get_H_A_n(), get_H_A_k(), get_H_A_d()};
     nmod_mat_t H_A;
-    nmod_mat_init(H_A, C_A.t, C_A.n, MOD);
-    generate_parity_check_matrix(C_A.n, C_A.k, 1, H_A);
+    nmod_mat_init(H_A, C_A.n - C_A.k, C_A.n, MOD);
+    generate_parity_check_matrix(C_A.n, C_A.k, C_A.t, H_A, output_file);
 
-    struct code C1 = {C_A.n / 2, C_A.n / 2 - C_A.t + 1, C_A.t - 1};
+    struct code C1 = {get_G1_n(), get_G1_k(), get_G1_d()};
     nmod_mat_t G1;
     nmod_mat_init(G1, C1.k, C1.n, MOD);
-    create_generator_matrix(G1, C1.n, C1.k, 1);
+    create_generator_matrix(G1, C1.n, C1.k, C1.t, output_file);
 
-    struct code C2 = {C_A.n / 2 + 1, C_A.n / 2 - C_A.t + 1, C_A.t};
+    struct code C2 = {get_G2_n(), get_G2_k(), get_G2_d()};
     nmod_mat_t G2;
     nmod_mat_init(G2, C2.k, C2.n, MOD);
-    create_generator_matrix(G2, C2.n, C2.k, 1);
+    create_generator_matrix(G2, C2.n, C2.k, C2.t, output_file);
 
     if (PRINT) {
-        printf("\nParity check matrix, H_A:\n\n");
-        nmod_mat_print(H_A);
-        printf("\nGenerator matrix, G1:\n\n");
-        nmod_mat_print(G1);
-        printf("\nGenerator matrix, G2:\n\n");
-        nmod_mat_print(G2);
+        fprintf(output_file, "\nParity check matrix, H_A:\n\n");
+        print_matrix(output_file, H_A);
+        fprintf(output_file, "\nGenerator matrix, G1:\n\n");
+        print_matrix(output_file, G1);
+        fprintf(output_file, "\nGenerator matrix, G2:\n\n");
+        print_matrix(output_file, G2);
     }
 
-    unsigned char *message = calloc(C1.k, sizeof(unsigned char));
-    const unsigned long message_len = C1.k;
-
-    printf("\n-----------Message Signature-----------\n");
+    fprintf(output_file, "\n-----------Message Signature-----------\n");
     nmod_mat_t F;
-    nmod_mat_init(F, C_A.t, C1.k, MOD);
+    nmod_mat_init(F, C_A.n - C_A.k, C_A.k, MOD);
 
     nmod_mat_t signature;
     nmod_mat_init(signature, 1, C_A.n, MOD);
 
-    generate_signature(message, message_len, C_A, C1, C2, H_A, G1, G2, F, signature);
+    unsigned char hash[crypto_generichash_BYTES];
+    crypto_generichash(hash, sizeof(hash), message, message_len, NULL, 0);
+
+    long long hash_size = sizeof(hash);
+    generate_signature(hash, hash_size, message_len, C_A, C1, C2, H_A, G1, G2, F, signature, output_file);
 
     if (PRINT) {
-        printf("\nPublic Key, F:\n\n");
-        nmod_mat_print(F);
-        printf("\nSignature:\n\n");
-        nmod_mat_print(signature);
+        fprintf(output_file, "\nPublic Key, F:\n\n");
+        print_matrix(output_file, F);
+        fprintf(output_file, "\nSignature:\n\n");
+        print_matrix(output_file, signature);
     }
 
-    printf("\n-----------Verification-----------\n");
-    verify_signature(message, message_len, C_A.n, signature, C_A.t, C1.k, F, C_A, H_A);
+    fprintf(output_file, "\n-----------Verification-----------\n");
+    verify_signature(hash, hash_size, message_len, C_A.n, signature, F, C_A, H_A, output_file);
 
     nmod_mat_clear(H_A);
     nmod_mat_clear(F);
     nmod_mat_clear(signature);
-    free(message);
+    // free((void *) get_MESSAGE());
+    fclose(output_file);
 
     return 0;
 }
