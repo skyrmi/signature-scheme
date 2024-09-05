@@ -21,16 +21,19 @@ uint32_t random_range(uint32_t min, uint32_t max) {
 
 static void generate_random_params(Params *p) {
     do {
-        p->n = random_range(40, 50);
-        p->k = random_range(10, 15);
-        p->d = random_range(12, 14);
+        p->n = random_range(16, 17);
+        p->k = random_range(6, 7);
+        p->d = random_range(3, 4);
     } while (p->n <= p->k || p->n <= p->d);
 }
 
 static bool get_yes_no_input(const char *prompt) {
     char response[10];
     printf("%s (y/n): ", prompt);
-    scanf("%9s", response);
+    if(scanf("%9s", response) == 0) {
+        fprintf(stderr, "Could not read user response\n");
+        exit(EXIT_FAILURE);
+    }
     return (response[0] == 'y' || response[0] == 'Y');
 }
 
@@ -38,11 +41,21 @@ static void get_param_input(Params *p, const char *name) {
     do {
         printf("Enter %s parameters (ensure n > k and n > d):\n", name);
         printf("n: ");
-        scanf("%u", &p->n);
+        if (scanf("%u", &p->n) != 1) {
+            fprintf(stderr, "Could not read user response\n");
+            exit(EXIT_FAILURE);
+        }
+
         printf("k: ");
-        scanf("%u", &p->k);
+        if (scanf("%u", &p->k) != 1) {
+            fprintf(stderr, "Could not read user response\n");
+            exit(EXIT_FAILURE);
+        }
         printf("d: ");
-        scanf("%u", &p->d);
+        if (scanf("%u", &p->d) != 1) {
+            fprintf(stderr, "Could not read user response\n");
+            exit(EXIT_FAILURE);
+        }
 
         if (p->n <= p->k || p->n <= p->d) {
             printf("Invalid input: n must be greater than both k and d. Please try again.\n");
@@ -67,10 +80,15 @@ void get_user_input(Params *g1, Params *g2, char **message, size_t *message_len)
     }
 
     if (get_yes_no_input("Do you want to input a custom message?")) {
-        printf("Enter your message: ");
-        char buffer[1024];
+        printf("Enter your message (length same as g1->k): ");
+        char buffer[g1->k + 1];
         getchar();
-        fgets(buffer, sizeof(buffer), stdin);
+
+        if (fgets(buffer, sizeof(buffer), stdin) == NULL) {
+            fprintf(stderr, "Could not read custom message\n");
+            exit(EXIT_FAILURE);
+        }
+
         *message_len = strlen(buffer);
         *message = malloc(*message_len + 1);
         if (*message == NULL) {
@@ -79,14 +97,20 @@ void get_user_input(Params *g1, Params *g2, char **message, size_t *message_len)
         }
         strcpy(*message, buffer);
     } else {
-        const char *default_message = "Arbitrary data to hash";
-        *message_len = strlen(default_message);
-        *message = malloc(*message_len + 1);
+        char random_message[g1->k + 1];
+
+        for (size_t i = 0; i < g1->k; ++i) {
+            random_message[i] = random_range(65, 75);
+        }
+        random_message[g1->k] = '\0';
+
+        *message_len = strlen(random_message);
+        *message = malloc(*message_len) + 1;
         if (*message == NULL) {
             fprintf(stderr, "Memory allocation failed\n");
             exit(1);
         }
-        strcpy(*message, default_message);
+        strcpy(*message, random_message);
         printf("Default message used.\n");
     }
 
