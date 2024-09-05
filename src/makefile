@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -g -O3 -I/usr/bin/include
+CFLAGS = -g -O3 -I/usr/bin/include/
 LDFLAGS = -L/usr/bin/lib/
 LDLIBS = -lflint -lgmp -lmpfr -lsodium
 
