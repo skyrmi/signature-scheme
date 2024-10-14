@@ -73,6 +73,10 @@ void get_user_input(Params *g1, Params *g2, char **message, size_t *message_len)
 
     if (get_yes_no_input("Do you want to input G2 parameters?")) {
         get_param_input(g2, "G2");
+        if (g1->k != g2->k) {
+            fprintf(stderr, "Different k values, setting G2->k to %u\n", g1->k);
+            g2->k = g1->k;
+        }
     } else {
         generate_random_params(g2);
         g2->k = g1->k;
