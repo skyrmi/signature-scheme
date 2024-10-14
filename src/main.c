@@ -83,7 +83,7 @@ int get_distance_from_executable(nmod_mat_t gen_matrix) {
     return distance;
 }
 
-void create_generator_matrix(nmod_mat_t gen_matrix, slong n, slong k, slong d, FILE *output_file) { 
+void create_generator_matrix(slong n, slong k, slong d, nmod_mat_t gen_matrix, FILE *output_file) { 
     // Initialize the generator matrix with [I_k | 0]
     nmod_mat_init(gen_matrix, k, n, MOD);
 
@@ -128,10 +128,10 @@ void create_generator_matrix(nmod_mat_t gen_matrix, slong n, slong k, slong d, F
     nmod_mat_clear(v);
 }
 
-void generate_parity_check_matrix(unsigned long n, unsigned long k, unsigned long d, nmod_mat_t H, FILE *output_file) {
+void generate_parity_check_matrix(slong n, slong k, slong d, nmod_mat_t H, FILE *output_file) {
     nmod_mat_t G;
     nmod_mat_init (G, k, n, MOD);
-    create_generator_matrix(G, n, k, d, output_file);
+    create_generator_matrix(n, k, d, G, output_file);
     
     nmod_mat_zero(H);
 
@@ -285,6 +285,27 @@ void combine_generator_matrices(nmod_mat_t G1, nmod_mat_t G2, FILE* output_file)
     nmod_mat_clear(G);
 }
 
+// Function to handle matrix generation or loading
+void get_or_generate_matrix(const char* prefix, int n, int k, int d, nmod_mat_t matrix, 
+                            void (*generate_func)(slong, slong, slong, nmod_mat_t, FILE*), 
+                            FILE* output_file) {
+    char* filename = generate_matrix_filename(prefix, n, k, d);
+    if (filename == NULL) {
+        fprintf(stderr, "Failed to generate filename\n");
+        return;
+    }
+
+    if (!load_matrix(filename, matrix)) {
+        generate_func(n, k, d, matrix, output_file);
+        save_matrix(filename, matrix);
+        fprintf(output_file, "Generated and cached %s matrix.\n", prefix);
+    } else {
+        fprintf(output_file, "Loaded %s matrix from cache.\n", prefix);
+    }
+
+    free(filename);
+}
+
 int main(void)
 {
     Params g1, g2;
@@ -300,17 +321,18 @@ int main(void)
     struct code C_A = {get_H_A_n(), get_H_A_k(), get_H_A_d()};
     nmod_mat_t H_A;
     nmod_mat_init(H_A, C_A.n - C_A.k, C_A.n, MOD);
-    generate_parity_check_matrix(C_A.n, C_A.k, C_A.t, H_A, output_file);
+    // note to self: 2t + 1;
+    get_or_generate_matrix("H", C_A.n, C_A.k, C_A.t, H_A, generate_parity_check_matrix, output_file);
 
     struct code C1 = {get_G1_n(), get_G1_k(), get_G1_d()};
     nmod_mat_t G1;
     nmod_mat_init(G1, C1.k, C1.n, MOD);
-    create_generator_matrix(G1, C1.n, C1.k, C1.t, output_file);
+    get_or_generate_matrix("G", C1.n, C1.k, C1.t, G1, create_generator_matrix, output_file);
 
     struct code C2 = {get_G2_n(), get_G2_k(), get_G2_d()};
     nmod_mat_t G2;
     nmod_mat_init(G2, C2.k, C2.n, MOD);
-    create_generator_matrix(G2, C2.n, C2.k, C2.t, output_file);
+    get_or_generate_matrix("G", C2.n, C2.k, C2.t, G2, create_generator_matrix, output_file);
 
     if (PRINT) {
         fprintf(output_file, "\nParity check matrix, H_A:\n\n");
@@ -322,6 +344,7 @@ int main(void)
     }
 
     fprintf(output_file, "\n-----------Message Signature-----------\n");
+    fprintf(output_file, "\nMessage: %s", message);
     nmod_mat_t F;
     nmod_mat_init(F, C_A.n - C_A.k, C_A.k, MOD);
 
@@ -347,7 +370,6 @@ int main(void)
     nmod_mat_clear(H_A);
     nmod_mat_clear(F);
     nmod_mat_clear(signature);
-    // free((void *) get_MESSAGE());
     fclose(output_file);
 
     return 0;

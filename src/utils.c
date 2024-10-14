@@ -1,8 +1,13 @@
 #include <stdlib.h>
 #include <sodium.h>
+#include <flint/flint.h>
+#include <flint/nmod_mat.h>
 
-static int compare_ints(const void* a, const void* b)
-{
+#define CACHE_DIR "../matrix_cache/"
+#define MAX_FILENAME_LENGTH 256
+#define MOD 2
+
+static int compare_ints(const void* a, const void* b) {
     int arg1 = *(const int*) a;
     int arg2 = *(const int*) b;
  
@@ -31,4 +36,69 @@ void generate_random_set(unsigned long upper_bound, unsigned long size, unsigned
 
     free(arr);
     qsort(set, size, sizeof(set[0]), compare_ints);
+}
+
+// Function to generate a filename for a matrix
+char* generate_matrix_filename(const char* prefix, int n, int k, int d) {
+    char* filename = malloc(MAX_FILENAME_LENGTH);
+    if (filename == NULL) {
+        fprintf(stderr, "Memory allocation failed\n");
+        return NULL;
+    }
+    sprintf(filename, "%s%s_%d_%d_%d.txt", CACHE_DIR, prefix, n, k, d);
+    return filename;
+}
+
+// Function to save a matrix to a text file
+void save_matrix(const char* filename, const nmod_mat_t matrix) {
+    FILE* file = fopen(filename, "w");
+    if (file == NULL) {
+        fprintf(stderr, "Error opening file for writing: %s\n", filename);
+        return;
+    }
+    
+    slong rows = nmod_mat_nrows(matrix);
+    slong cols = nmod_mat_ncols(matrix);
+    fprintf(file, "%ld %ld\n", rows, cols);
+    
+    for (slong i = 0; i < rows; i++) {
+        for (slong j = 0; j < cols; j++) {
+            slong value = nmod_mat_entry(matrix, i, j);
+            fprintf(file, "%lu ", value);
+        }
+        fprintf(file, "\n");
+    }
+    
+    fclose(file);
+}
+
+// Function to load a matrix from a text file
+int load_matrix(const char* filename, nmod_mat_t matrix) {
+    FILE* file = fopen(filename, "r");
+    if (file == NULL) {
+        return 0;  // File doesn't exist or can't be opened
+    }
+    
+    slong rows, cols;
+    if (fscanf(file, "%ld %ld", &rows, &cols) != 2) {
+        fclose(file);
+        return 0;  // Failed to read dimensions
+    }
+    
+    nmod_mat_clear(matrix);
+    nmod_mat_init(matrix, rows, cols, MOD);
+    
+    for (slong i = 0; i < rows; i++) {
+        for (slong j = 0; j < cols; j++) {
+            unsigned long value;
+            if (fscanf(file, "%lu", &value) != 1) {
+                fclose(file);
+                return 0;  // Failed to read value
+            }
+            nmod_mat_set_entry(matrix, i, j, value);
+        }
+    }
+    
+    fclose(file);
+    return 1;
 }
