@@ -104,12 +104,12 @@ void get_user_input(Params *g1, Params *g2, char **message, size_t *message_len)
         char random_message[g1->k + 1];
 
         for (size_t i = 0; i < g1->k; ++i) {
-            random_message[i] = random_range(65, 75);
+            random_message[i] = random_range(65, 90);
         }
         random_message[g1->k] = '\0';
 
         *message_len = strlen(random_message);
-        *message = malloc(*message_len) + 1;
+        *message = malloc(*message_len + 1);
         if (*message == NULL) {
             fprintf(stderr, "Memory allocation failed\n");
             exit(1);
