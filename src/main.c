@@ -85,8 +85,6 @@ int get_distance_from_executable(nmod_mat_t gen_matrix) {
 }
 
 void create_generator_matrix(slong n, slong k, slong d, nmod_mat_t gen_matrix, FILE *output_file) { 
-    clock_t begin = clock();
-
     // Initialize the generator matrix with [I_k | 0]
     nmod_mat_init(gen_matrix, k, n, MOD);
 
@@ -129,13 +127,9 @@ void create_generator_matrix(slong n, slong k, slong d, nmod_mat_t gen_matrix, F
         } 
     } 
     nmod_mat_clear(v);
-    clock_t end = clock();
-    double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    printf("Time taken by create_generator_matrix(): %lf", time_spent);
 }
 
 void generate_parity_check_matrix(slong n, slong k, slong d, nmod_mat_t H, FILE *output_file) {
-    clock_t begin = clock();
     nmod_mat_t G;
     nmod_mat_init (G, k, n, MOD);
     create_generator_matrix(n, k, d, G, output_file);
@@ -153,9 +147,6 @@ void generate_parity_check_matrix(slong n, slong k, slong d, nmod_mat_t H, FILE 
     }
     
     nmod_mat_clear(G);
-    clock_t end = clock();
-    double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    printf("Time taken by generate_parity_check_matrix(): %lf", time_spent);
 }
 
 void generate_signature(unsigned char hash[], long long hash_size, size_t message_len,
@@ -163,7 +154,6 @@ void generate_signature(unsigned char hash[], long long hash_size, size_t messag
     nmod_mat_t H_A, nmod_mat_t G1, nmod_mat_t G2, 
     nmod_mat_t F, nmod_mat_t signature, FILE *output_file) {
 
-    clock_t begin = clock();
     nmod_mat_t bin_hash;
     nmod_mat_init(bin_hash, 1, message_len, MOD);
     for (size_t i = 0; i < message_len; ++i) {
@@ -229,10 +219,6 @@ void generate_signature(unsigned char hash[], long long hash_size, size_t messag
     nmod_mat_clear(G_star);
     nmod_mat_clear(G_star_T);
     nmod_mat_clear(bin_hash);
-
-    clock_t end = clock();
-    double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    printf("Time taken by generate_signature(): %lf", time_spent);
 }
 
 void verify_signature(unsigned char hash[], long long hash_size, size_t message_len,
@@ -342,6 +328,10 @@ int main(void)
 
     FILE *output_file = fopen(OUTPUT_PATH, "w");
 
+    char timing_filename[256];
+    sprintf(timing_filename, "../timing/G1_%u_%u_%u_G2_%u_%u_%u_%s.txt", get_G1_n(), get_G1_k(), get_G1_d(), get_G2_n(), get_G2_k(), get_G2_d(), regenerate ? "generated" : "stored");
+    FILE *timing_file = fopen(timing_filename, "w");
+
     clock_t keygen_begin = clock();
 
     fprintf(output_file, "\n-----------Key Generation-----------\n");
@@ -371,9 +361,11 @@ int main(void)
 
     clock_t keygen_end = clock();
     double keygen_time_spent = (double)(keygen_end - keygen_begin) / CLOCKS_PER_SEC;
-    printf("Time taken by main(): %lf", keygen_time_spent);
+    printf("keygen(): %lf", keygen_time_spent);
 
     fprintf(output_file, "\n-----------Message Signature-----------\n");
+    clock_t signature_begin = clock();
+
     fprintf(output_file, "\nMessage: %s\n", message);
     nmod_mat_t F;
     nmod_mat_init(F, C_A.n - C_A.k, C_A.k, MOD);
@@ -394,17 +386,28 @@ int main(void)
         print_matrix(output_file, signature);
     }
 
+    clock_t signature_end = clock();
+    double signature_time_spent = (double)(signature_end - signature_begin) / CLOCKS_PER_SEC;
+    fprintf(timing_file, "generate_signature(): %lf", signature_time_spent);
+
     fprintf(output_file, "\n-----------Verification-----------\n");
+    clock_t verification_begin = clock();
+    
     verify_signature(hash, hash_size, message_len, C_A.n, signature, F, C_A, H_A, output_file);
+
+    clock_t verification_end = clock();
+    double verification_time_spent = (double)(verification_end - verification_begin) / CLOCKS_PER_SEC;
+    fprintf(timing_file, "generate_signature(): %lf", verification_time_spent);
 
     nmod_mat_clear(H_A);
     nmod_mat_clear(F);
     nmod_mat_clear(signature);
     fclose(output_file);
+    fclose(timing_file);
 
     clock_t end = clock();
     double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    printf("Time taken by main(): %lf", time_spent);
+    fprintf(timing_file, "main(): %lf", time_spent);
 
     return 0;
 }
