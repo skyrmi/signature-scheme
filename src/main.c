@@ -310,7 +310,10 @@ int main(void)
     Params g1, g2;
     char *msg;
     size_t message_len;
-    bool regenerate = get_regenerate_flag();
+    bool regenerate = true;
+    if (get_yes_no_input("Use pre-computed matrix if found?")) {
+        regenerate = false;
+    }
 
     get_user_input(&g1, &g2, &msg, &message_len);
     const unsigned char* message = get_MESSAGE();

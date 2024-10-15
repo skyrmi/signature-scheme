@@ -11,6 +11,7 @@ typedef struct {
 } Params;
 
 void init_params(void);
+bool get_yes_no_input(const char *prompt);
 void get_user_input(Params *g1, Params *g2, char **message, size_t *message_len);
 uint32_t random_range(uint32_t min, uint32_t max);
 
@@ -25,6 +26,5 @@ uint32_t get_G2_k(void);
 uint32_t get_G2_d(void);
 const unsigned char* get_MESSAGE(void);
 size_t get_MESSAGE_LEN(void);
-bool get_regenerate_flag(void);
 
 #endif

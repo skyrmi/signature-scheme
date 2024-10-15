@@ -1,14 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
 #include <sodium.h>
 #include "params.h"
 
 static Params G1, G2;
 static char *MESSAGE = NULL;
 static size_t MESSAGE_LEN = 0;
-static bool REGENERATE = true;
 
 void init_params(void) {
     if (sodium_init() < 0) {
@@ -29,7 +27,7 @@ static void generate_random_params(Params *p) {
     } while (p->n <= p->k || p->n <= p->d);
 }
 
-static bool get_yes_no_input(const char *prompt) {
+bool get_yes_no_input(const char *prompt) {
     char response[10];
     printf("%s (y/n): ", prompt);
     if(scanf("%9s", response) == 0) {
@@ -120,10 +118,6 @@ void get_user_input(Params *g1, Params *g2, char **message, size_t *message_len)
         printf("Random message used.\n");
     }
 
-    if (get_yes_no_input("Use pre-computed matrices if found?")) {
-        REGENERATE = false;
-    }
-
     G1 = *g1;
     G2 = *g2;
     MESSAGE = *message;
@@ -142,4 +136,3 @@ uint32_t get_G2_k(void) { return G2.k; }
 uint32_t get_G2_d(void) { return G2.d; }
 const unsigned char* get_MESSAGE(void) { return (const unsigned char *) MESSAGE; }
 size_t get_MESSAGE_LEN(void) { return MESSAGE_LEN; }
-bool get_regenerate_flag(void) { return REGENERATE; }
