@@ -332,9 +332,8 @@ int main(void)
     sprintf(timing_filename, "../timing/G1_%u_%u_%u_G2_%u_%u_%u_%s.txt", get_G1_n(), get_G1_k(), get_G1_d(), get_G2_n(), get_G2_k(), get_G2_d(), regenerate ? "generated" : "stored");
     FILE *timing_file = fopen(timing_filename, "w");
 
-    clock_t keygen_begin = clock();
-
     fprintf(output_file, "\n-----------Key Generation-----------\n");
+    clock_t keygen_begin = clock();
     struct code C_A = {get_H_A_n(), get_H_A_k(), get_H_A_d()};
     nmod_mat_t H_A;
     nmod_mat_init(H_A, C_A.n - C_A.k, C_A.n, MOD);
@@ -361,7 +360,7 @@ int main(void)
 
     clock_t keygen_end = clock();
     double keygen_time_spent = (double)(keygen_end - keygen_begin) / CLOCKS_PER_SEC;
-    printf("keygen(): %lf", keygen_time_spent);
+    fprintf(timing_file, "key_generation(): %lf\n", keygen_time_spent);
 
     fprintf(output_file, "\n-----------Message Signature-----------\n");
     clock_t signature_begin = clock();
@@ -388,7 +387,7 @@ int main(void)
 
     clock_t signature_end = clock();
     double signature_time_spent = (double)(signature_end - signature_begin) / CLOCKS_PER_SEC;
-    fprintf(timing_file, "generate_signature(): %lf", signature_time_spent);
+    fprintf(timing_file, "generate_signature(): %lf\n", signature_time_spent);
 
     fprintf(output_file, "\n-----------Verification-----------\n");
     clock_t verification_begin = clock();
@@ -397,7 +396,7 @@ int main(void)
 
     clock_t verification_end = clock();
     double verification_time_spent = (double)(verification_end - verification_begin) / CLOCKS_PER_SEC;
-    fprintf(timing_file, "generate_signature(): %lf", verification_time_spent);
+    fprintf(timing_file, "verify_signature(): %lf\n", verification_time_spent);
 
     nmod_mat_clear(H_A);
     nmod_mat_clear(F);
@@ -407,7 +406,7 @@ int main(void)
 
     clock_t end = clock();
     double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    fprintf(timing_file, "main(): %lf", time_spent);
+    fprintf(timing_file, "main(): %lf\n", time_spent);
 
     return 0;
 }
