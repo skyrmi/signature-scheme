@@ -102,3 +102,12 @@ int load_matrix(const char* filename, nmod_mat_t matrix) {
     fclose(file);
     return 1;
 }
+
+int file_exists(const char* filename) {
+    FILE* file = fopen(filename, "r");
+    if (file == NULL) {
+        return 0;
+    }
+    fclose(file);
+    return 1;
+}

@@ -329,7 +329,12 @@ int main(void)
     FILE *output_file = fopen(OUTPUT_PATH, "w");
 
     char timing_filename[256];
-    sprintf(timing_filename, "../timing/G1_%u_%u_%u_G2_%u_%u_%u_%s.txt", get_G1_n(), get_G1_k(), get_G1_d(), get_G2_n(), get_G2_k(), get_G2_d(), regenerate ? "generated" : "stored");
+    char *G1_file, *G2_file;
+    sprintf(G1_file, "../matrix_cache/G_%u_%u_%u.txt", get_G1_n(), get_G1_k(), get_G1_d());
+    sprintf(G2_file, "../matrix_cache/G_%u_%u_%u.txt", get_G2_n(), get_G2_k(), get_G2_d());
+    sprintf(timing_filename, "../timing/G1_%u_%u_%u_G2_%u_%u_%u_%s.txt", 
+        get_G1_n(), get_G1_k(), get_G1_d(), get_G2_n(), get_G2_k(), get_G2_d(),
+             (file_exists(G1_file) && file_exists(G2_file)) ? "stored" : "generated");
     FILE *timing_file = fopen(timing_filename, "w");
 
     fprintf(output_file, "\n-----------Key Generation-----------\n");
@@ -402,11 +407,11 @@ int main(void)
     nmod_mat_clear(F);
     nmod_mat_clear(signature);
     fclose(output_file);
-    fclose(timing_file);
 
     clock_t end = clock();
     double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
     fprintf(timing_file, "main(): %lf\n", time_spent);
 
+    fclose(timing_file);
     return 0;
 }
