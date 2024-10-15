@@ -311,11 +311,12 @@ int main(void)
     char *msg;
     size_t message_len;
     bool regenerate = true;
+
+    get_user_input(&g1, &g2, &msg, &message_len);
     if (get_yes_no_input("Use pre-computed matrix if found?")) {
         regenerate = false;
     }
-
-    get_user_input(&g1, &g2, &msg, &message_len);
+    
     const unsigned char* message = get_MESSAGE();
 
     FILE *output_file = fopen(OUTPUT_PATH, "w");
