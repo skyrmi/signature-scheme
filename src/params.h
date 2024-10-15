@@ -25,5 +25,6 @@ uint32_t get_G2_k(void);
 uint32_t get_G2_d(void);
 const unsigned char* get_MESSAGE(void);
 size_t get_MESSAGE_LEN(void);
+bool get_regenerate_flag(void);
 
 #endif
