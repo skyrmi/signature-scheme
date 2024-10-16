@@ -52,7 +52,7 @@ def categorize_and_parse_files():
 # 1. Plot comparison between generated and precomputed matrices
 def plot_generated_vs_precomputed(generated_timings, stored_timings):
     # Compare the execution times for each function between generated and precomputed matrices
-    functions = ["key_generation", "generate_signature", "signature_verification", "main"]
+    functions = ["key_generation()", "generate_signature()", "signature_verification()", "main()"]
     
     generated_times = {fn: [] for fn in functions}
     stored_times = {fn: [] for fn in functions}
@@ -79,8 +79,10 @@ def plot_generated_vs_precomputed(generated_timings, stored_timings):
 
 # 2. Plot execution time vs. varying n (fixed k and d)
 def plot_time_vs_n(timings, function_name):
-    ns = [entry["g1_n"] for entry in timings]
-    times = [entry["timings"].get(function_name, 0) for entry in timings]
+    sorted_timings = sorted(timings, key=lambda x: x['g1_n'])
+
+    ns = [entry["g1_n"] for entry in sorted_timings]
+    times = [entry["timings"].get(function_name, 0) for entry in sorted_timings]
 
     plt.figure()
     plt.plot(ns, times, marker='o')
@@ -92,14 +94,16 @@ def plot_time_vs_n(timings, function_name):
 
 # 3. Plot execution time vs. varying k (fixed n and d)
 def plot_time_vs_k(timings, function_name):
-    ks = [entry["g1_k"] for entry in timings]
-    times = [entry["timings"].get(function_name, 0) for entry in timings]
+    timings = sorted(timings, key=lambda entry: entry['g1_k'])
+    
+    k_values = [entry['g1_k'] for entry in timings]  
+    times = [entry["timings"].get(function_name + "()", 0) for entry in timings]
 
-    plt.figure()
-    plt.plot(ks, times, marker='o')
-    plt.title(f"Execution time of {function_name} vs k")
-    plt.xlabel("k (dimension)")
-    plt.ylabel(f"{function_name} execution time (s)")
+    plt.figure(figsize=(8, 6))
+    plt.plot(k_values, times, marker='o', linestyle='-', color='b')
+    plt.xlabel('k (dimension)')
+    plt.ylabel(f'{function_name} execution time (s)')
+    plt.title(f'Execution time of {function_name} vs k')
     plt.grid(True)
     plt.show()
 
@@ -110,7 +114,7 @@ def run_analysis():
     # Plot 1: Comparison between generated and precomputed matrices
     plot_generated_vs_precomputed(generated_timings, stored_timings)
 
-    function_name = "main"
+    function_name = "main()"
 
     # Plot 2: Increase in time with increasing n (generated matrices)
     plot_time_vs_n(generated_timings, function_name)

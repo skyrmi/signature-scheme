@@ -1,11 +1,13 @@
 import subprocess
 
 # 1. Parameter set for "Generated vs Pre-computed Matrices"
-generated_vs_precomputed_params = {
+generated_vs_precomputed_params = [
+    {
     "g1": {"n": 40, "k": 15, "d": 6},
     "g2": {"n": 50, "k": 15, "d": 7},
     "custom_message": False
-}
+    }
+]
 
 # 2. Varying n with fixed k and d
 vary_n_params = {
@@ -29,16 +31,17 @@ vary_k_params = {
 def benchmark_generated_vs_precomputed():
     print("\n--- Benchmark: Generated vs Pre-computed Matrices ---")
     
-    for use_precomputed in [True, False]:
-        params = generated_vs_precomputed_params.copy()
-        params['use_precomputed_matrix'] = use_precomputed
+    for params in generated_vs_precomputed_params:
+        for use_precomputed in [False, True]:
+            current_params = params.copy() 
+            current_params['use_precomputed_matrix'] = use_precomputed
 
-        if use_precomputed:
-            print("\nRun: Using pre-computed matrices...")
-        else:
-            print("\nRun: Generating matrices...")
+            if use_precomputed:
+                print("\nRun: Using pre-computed matrices...")
+            else:
+                print("\nRun: Generating matrices...")
 
-        run_benchmark(params)
+            run_benchmark(current_params)
 
 # 2. Benchmark: Varying n (Fixed k and d)
 def benchmark_vary_n():
@@ -52,7 +55,7 @@ def benchmark_vary_n():
             "g1": {"n": n, "k": k, "d": d},
             "g2": {"n": n + 10, "k": k, "d": d},
             "custom_message": False,
-            "use_precomputed_matrix": True
+            "use_precomputed_matrix": False,
         }
         print(f"\nRun: Varying n to {n} (g1), {n+10} (g2)...")
         run_benchmark(params)
@@ -69,7 +72,7 @@ def benchmark_vary_k():
             "g1": {"n": n, "k": k, "d": d},
             "g2": {"n": n + 10, "k": k, "d": d},  
             "custom_message": False,
-            "use_precomputed_matrix": True
+            "use_precomputed_matrix": False,
         }
         print(f"\nRun: Varying k to {k} (g1 and g2)...")
         run_benchmark(params)
@@ -100,8 +103,6 @@ def run_benchmark(parameter_set):
         capture_output=True
     )
 
-    print("Program output:")
-    print(result.stdout)
     print("Error output (if any):")
     print(result.stderr)
 

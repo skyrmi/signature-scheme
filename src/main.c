@@ -225,7 +225,6 @@ void verify_signature(unsigned char hash[], long long hash_size, size_t message_
     unsigned long sig_len, nmod_mat_t signature, nmod_mat_t F,
     struct code C_A, nmod_mat_t H_A, FILE *output_file)  {
     
-    clock_t begin = clock();
     nmod_mat_t hash_T;
     nmod_mat_init(hash_T, message_len, 1, MOD);
     for (size_t i = 0; i < message_len; ++i) {
@@ -261,10 +260,6 @@ void verify_signature(unsigned char hash[], long long hash_size, size_t message_
     nmod_mat_clear(left);
     nmod_mat_clear(sig_T);
     nmod_mat_clear(right);
-
-    clock_t end = clock();
-    double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    printf("Time taken by verify_signature(): %lf", time_spent);
 }
 
 void combine_generator_matrices(nmod_mat_t G1, nmod_mat_t G2, FILE* output_file) {
@@ -329,12 +324,12 @@ int main(void)
     FILE *output_file = fopen(OUTPUT_PATH, "w");
 
     char timing_filename[256];
-    char *G1_file, *G2_file;
+    char G1_file[256], G2_file[256];
     sprintf(G1_file, "../matrix_cache/G_%u_%u_%u.txt", get_G1_n(), get_G1_k(), get_G1_d());
     sprintf(G2_file, "../matrix_cache/G_%u_%u_%u.txt", get_G2_n(), get_G2_k(), get_G2_d());
     sprintf(timing_filename, "../timing/G1_%u_%u_%u_G2_%u_%u_%u_%s.txt", 
         get_G1_n(), get_G1_k(), get_G1_d(), get_G2_n(), get_G2_k(), get_G2_d(),
-             (file_exists(G1_file) && file_exists(G2_file)) ? "stored" : "generated");
+             (file_exists(G1_file) && file_exists(G2_file) && !regenerate) ? "stored" : "generated");
     FILE *timing_file = fopen(timing_filename, "w");
 
     fprintf(output_file, "\n-----------Key Generation-----------\n");
