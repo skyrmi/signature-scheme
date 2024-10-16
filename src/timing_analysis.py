@@ -52,20 +52,20 @@ def categorize_and_parse_files():
 # 1. Plot comparison between generated and precomputed matrices
 def plot_generated_vs_precomputed(generated_timings, stored_timings):
     # Compare the execution times for each function between generated and precomputed matrices
-    functions = ["key_generation()", "generate_signature()", "signature_verification()", "main()"]
+    functions = ["key_generation()", "generate_signature()", "verify_signature()", "main()"]
     
     generated_times = {fn: [] for fn in functions}
     stored_times = {fn: [] for fn in functions}
     
     labels = []
 
-    for entry in generated_timings:
-        label = f"G1: n={entry['g1_n']}, k={entry['g1_k']}, d={entry['g1_d']} | G2: n={entry['g2_n']}, k={entry['g2_k']}, d={entry['g2_d']}"
+    for entry in sorted(generated_timings, key=lambda x: x['g1_n']):
+        label = f"{entry['g1_n']}, {entry['g1_k']}, {entry['g1_d']}"
         labels.append(label)
         for fn in functions:
             generated_times[fn].append(entry["timings"].get(fn, 0))
 
-    for entry in stored_timings:
+    for entry in sorted(stored_timings, key=lambda x: x['g1_n']):
         for fn in functions:
             stored_times[fn].append(entry["timings"].get(fn, 0))
 
