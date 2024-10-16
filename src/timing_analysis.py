@@ -105,9 +105,9 @@ def plot_time_vs_k(timings, function_name):
     timings = sorted(timings, key=lambda entry: entry['g1_k'])
     
     k_values = [entry['g1_k'] for entry in timings]  
-    times = [entry["timings"].get(function_name + "()", 0) for entry in timings]
+    times = [entry["timings"].get(function_name, 0) for entry in timings]
 
-    plt.figure(figsize=(8, 6))
+    plt.figure(figsize=(10, 6))
     plt.plot(k_values, times, marker='o', linestyle='-', color='b')
     plt.xlabel('k (dimension)')
     plt.ylabel(f'{function_name} execution time (s)')
