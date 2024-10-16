@@ -57,7 +57,11 @@ def plot_generated_vs_precomputed(generated_timings, stored_timings):
     generated_times = {fn: [] for fn in functions}
     stored_times = {fn: [] for fn in functions}
     
+    labels = []
+
     for entry in generated_timings:
+        label = f"G1: n={entry['g1_n']}, k={entry['g1_k']}, d={entry['g1_d']} | G2: n={entry['g2_n']}, k={entry['g2_k']}, d={entry['g2_d']}"
+        labels.append(label)
         for fn in functions:
             generated_times[fn].append(entry["timings"].get(fn, 0))
 
@@ -67,15 +71,19 @@ def plot_generated_vs_precomputed(generated_timings, stored_timings):
 
     # Plot comparison for each function
     for fn in functions:
-        plt.figure()
-        plt.plot(generated_times[fn], label="Generated")
-        plt.plot(stored_times[fn], label="Precomputed")
+        plt.figure(figsize=(10, 6)) 
+        plt.plot(generated_times[fn], label="Generated", marker='o')
+        plt.plot(stored_times[fn], label="Precomputed", marker='x')
+        
         plt.title(f"Comparison of {fn} between generated and precomputed matrices")
-        plt.xlabel("Run Index")
+        plt.xlabel("Parameter Sets (G1, G2)")
         plt.ylabel("Execution Time (s)")
+        plt.xticks(ticks=range(len(labels)), labels=labels, rotation=45, ha="right")  
         plt.legend()
         plt.grid(True)
+        plt.tight_layout()  
         plt.show()
+
 
 # 2. Plot execution time vs. varying n (fixed k and d)
 def plot_time_vs_n(timings, function_name):

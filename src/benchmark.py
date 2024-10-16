@@ -3,8 +3,18 @@ import subprocess
 # 1. Parameter set for "Generated vs Pre-computed Matrices"
 generated_vs_precomputed_params = [
     {
+    "g1": {"n": 25, "k": 10, "d": 5},
+    "g2": {"n": 50, "k": 10, "d": 6},
+    "custom_message": False
+    },
+    {
     "g1": {"n": 40, "k": 15, "d": 6},
     "g2": {"n": 50, "k": 15, "d": 7},
+    "custom_message": False
+    },
+    {
+    "g1": {"n": 60, "k": 20, "d": 10},
+    "g2": {"n": 70, "k": 20, "d": 11},
     "custom_message": False
     }
 ]
@@ -20,11 +30,11 @@ vary_n_params = {
 
 # 3. Varying k with fixed n and d
 vary_k_params = {
-    "n": 60,
+    "n": 40,
     "d": 6,
     "k_start": 10,
-    "k_end": 30,
-    "k_step": 5
+    "k_end": 20,
+    "k_step": 2
 }
 
 # 1. Benchmark: Generated vs Pre-computed Matrices
