@@ -60,7 +60,7 @@ def plot_generated_vs_precomputed(generated_timings, stored_timings):
     labels = []
 
     for entry in sorted(generated_timings, key=lambda x: x['g1_n']):
-        label = f"{entry['g1_n']}, {entry['g1_k']}, {entry['g1_d']}"
+        label = f"{entry['g1_n']}, {entry['g1_k']}, {entry['g1_d']}\n{entry['g2_n']}, {entry['g2_k']}, {entry['g2_d']}"
         labels.append(label)
         for fn in functions:
             generated_times[fn].append(entry["timings"].get(fn, 0))
@@ -78,7 +78,7 @@ def plot_generated_vs_precomputed(generated_timings, stored_timings):
         plt.title(f"Comparison of {fn} between generated and precomputed matrices")
         plt.xlabel("Parameter Sets (G1, G2)")
         plt.ylabel("Execution Time (s)")
-        plt.xticks(ticks=range(len(labels)), labels=labels, rotation=45, ha="right")  
+        plt.xticks(ticks=range(len(labels)), labels=labels, ha="right")  
         plt.legend()
         plt.grid(True)
         plt.tight_layout()  
