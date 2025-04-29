@@ -188,24 +188,17 @@ long weight(nmod_mat_t hash) {
     return weight;
 }
 
-void generate_signature(unsigned char hash[], long long hash_size, size_t message_len,
+void generate_signature(nmod_mat_t bin_hash, const unsigned char *message, size_t message_len,
     struct code C_A, struct code C1, struct code C2, 
     nmod_mat_t H_A, nmod_mat_t G1, nmod_mat_t G2, 
     nmod_mat_t F, nmod_mat_t signature, FILE *output_file) {
-
-    nmod_mat_t bin_hash;
-    nmod_mat_init(bin_hash, 1, message_len, MOD);
-    for (size_t i = 0; i < message_len; ++i) {
-        int val = hash[i % hash_size] % 2;
-        nmod_mat_set_entry(bin_hash, 0, i, val);
-    }
 
     unsigned long *J = malloc(C1.n * sizeof(unsigned long));
     generate_random_set(C_A.n, C1.n, J);
 
     if (PRINT) {
-        fprintf(output_file, "\nHash:\n\n");
-        print_matrix(output_file, bin_hash);
+        // fprintf(output_file, "\nHash:\n\n");
+        // print_matrix(output_file, bin_hash);
         
         fprintf(output_file, "\nRandom permutation: ");
         for (int i = 0; i < C1.n; ++i) {
@@ -253,23 +246,45 @@ void generate_signature(unsigned char hash[], long long hash_size, size_t messag
     nmod_mat_transpose(G_star_T, G_star);
 
     nmod_mat_mul(F, H_A, G_star_T);
-    nmod_mat_mul(signature, bin_hash, G_star);
 
+    do {
+        const unsigned int salt_len = message_len;
+        unsigned char salted_message[message_len + salt_len];
+        for (int i = 0; i < message_len; ++i)
+            salted_message[i] = message[i];
+        for (int i = message_len; i < message_len + salt_len; ++i)
+            salted_message[i] = randombytes_uniform(MOD); 
+
+        unsigned char hash[crypto_hash_sha256_BYTES];
+        crypto_hash_sha256(hash, salted_message, message_len + salt_len);
+        size_t hash_size = sizeof(hash);
+        
+        for (size_t i = 0; i < message_len; ++i) {
+            int val = hash[i % hash_size] % 2;
+            nmod_mat_set_entry(bin_hash, 0, i, val);
+        }
+
+        nmod_mat_mul(signature, bin_hash, G_star);
+    } while (weight(signature) < C_A.t);
+    
     nmod_mat_clear(G_star);
     nmod_mat_clear(G_star_T);
-    nmod_mat_clear(bin_hash);
 }
 
-void verify_signature(unsigned char hash[], long long hash_size, size_t message_len,
+void verify_signature(nmod_mat_t bin_hash, size_t message_len,
     unsigned long sig_len, nmod_mat_t signature, nmod_mat_t F,
     struct code C_A, nmod_mat_t H_A, FILE *output_file)  {
     
+    // nmod_mat_t hash_T;
+    // nmod_mat_init(hash_T, message_len, 1, MOD);
+    // for (size_t i = 0; i < message_len; ++i) {
+    //     int val =  hash[i % hash_size] % 2;
+    //     nmod_mat_set_entry(hash_T, i, 0, val);
+    // }
+
     nmod_mat_t hash_T;
     nmod_mat_init(hash_T, message_len, 1, MOD);
-    for (size_t i = 0; i < message_len; ++i) {
-        int val =  hash[i % hash_size] % 2;
-        nmod_mat_set_entry(hash_T, i, 0, val);
-    }
+    nmod_mat_transpose(hash_T, bin_hash);
     
     if (PRINT) {
         fprintf(output_file, "\nHash:\n\n");
@@ -411,11 +426,10 @@ int main(void)
     nmod_mat_t signature;
     nmod_mat_init(signature, 1, C_A.n, MOD);
 
-    unsigned char hash[crypto_hash_sha256_BYTES];
-    crypto_hash_sha256(hash, message, message_len);
+    nmod_mat_t bin_hash;
+    nmod_mat_init(bin_hash, 1, message_len, MOD);
 
-    long long hash_size = sizeof(hash);
-    generate_signature(hash, hash_size, message_len, C_A, C1, C2, H_A, G1, G2, F, signature, output_file);
+    generate_signature(bin_hash, message, message_len, C_A, C1, C2, H_A, G1, G2, F, signature, output_file);
 
     if (PRINT) {
         fprintf(output_file, "\nPublic Key, F:\n\n");
@@ -431,7 +445,7 @@ int main(void)
     fprintf(output_file, "\n-----------Verification-----------\n");
     clock_t verification_begin = clock();
     
-    verify_signature(hash, hash_size, message_len, C_A.n, signature, F, C_A, H_A, output_file);
+    verify_signature(bin_hash, message_len, C_A.n, signature, F, C_A, H_A, output_file);
 
     clock_t verification_end = clock();
     double verification_time_spent = (double)(verification_end - verification_begin) / CLOCKS_PER_SEC;
