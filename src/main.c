@@ -84,7 +84,9 @@ int get_distance_from_executable(nmod_mat_t gen_matrix) {
     return distance;
 }
 
-void create_generator_matrix(slong n, slong k, slong d, nmod_mat_t gen_matrix, FILE *output_file) { 
+
+// original generator matrix creation: relied on minimum distance check
+void old_create_generator_matrix(slong n, slong k, slong d, nmod_mat_t gen_matrix, FILE *output_file) { 
     // Initialize the generator matrix with [I_k | 0]
     nmod_mat_init(gen_matrix, k, n, MOD);
 
@@ -129,6 +131,33 @@ void create_generator_matrix(slong n, slong k, slong d, nmod_mat_t gen_matrix, F
     nmod_mat_clear(v);
 }
 
+// new generator matrix creation: based on Gilbert-Varshamov bound
+void create_generator_matrix(slong n, slong k, slong d, nmod_mat_t gen_matrix, FILE *output_file) { 
+    nmod_mat_init(gen_matrix, k, n, MOD);
+    nmod_mat_t full_rank_matrix;
+    nmod_mat_init(full_rank_matrix, k, n - k, MOD);
+
+    flint_rand_t state;
+    flint_randinit(state);
+    // Generate a full-rank random matrix of size (k, n-k)
+    nmod_mat_randrank(full_rank_matrix, state, k);
+
+    // Set the identity part in the first k columns of the generator matrix
+    for (slong current_row = 0; current_row < k; current_row++) { 
+        for (slong i = 0; i < k; i++) { 
+            nmod_mat_set_entry(gen_matrix, current_row, i, (i == current_row) ? 1 : 0); 
+        }
+
+        // Copy the corresponding random part from the full-rank matrix
+        for (slong i = k; i < n; i++) {
+            // nmod_mat_set_entry(gen_matrix, current_row, i, nmod_mat_get_entry(full_rank_matrix, current_row, i - k)); 
+            nmod_mat_set_entry(gen_matrix, current_row, i, randombytes_uniform(MOD)); 
+        }
+    }
+
+    nmod_mat_clear(full_rank_matrix); 
+}
+
 void generate_parity_check_matrix(slong n, slong k, slong d, nmod_mat_t H, FILE *output_file) {
     nmod_mat_t G;
     nmod_mat_init (G, k, n, MOD);
@@ -147,6 +176,16 @@ void generate_parity_check_matrix(slong n, slong k, slong d, nmod_mat_t H, FILE 
     }
     
     nmod_mat_clear(G);
+}
+
+long weight(nmod_mat_t hash) {
+    long weight = 0;
+    for (size_t i = 0; i < hash->c; ++i) {
+        if (nmod_mat_get_entry(hash, 0, i) == 1) {
+            ++weight;
+        }
+    }
+    return weight;
 }
 
 void generate_signature(unsigned char hash[], long long hash_size, size_t message_len,
@@ -282,7 +321,7 @@ void combine_generator_matrices(nmod_mat_t G1, nmod_mat_t G2, FILE* output_file)
     nmod_mat_rref(G);
     fprintf(output_file, "\nCombined generator G*:\n\n");
     print_matrix(output_file, G);
-    fprintf(output_file, "\nDistance of direct combination: %d\n", get_distance_from_executable(G));
+    // fprintf(output_file, "\nDistance of direct combination: %d\n", get_distance_from_executable(G));
     nmod_mat_clear(G);
 }
 
@@ -372,8 +411,8 @@ int main(void)
     nmod_mat_t signature;
     nmod_mat_init(signature, 1, C_A.n, MOD);
 
-    unsigned char hash[crypto_generichash_BYTES];
-    crypto_generichash(hash, sizeof(hash), message, message_len, NULL, 0);
+    unsigned char hash[crypto_hash_sha256_BYTES];
+    crypto_hash_sha256(hash, message, message_len);
 
     long long hash_size = sizeof(hash);
     generate_signature(hash, hash_size, message_len, C_A, C1, C2, H_A, G1, G2, F, signature, output_file);
@@ -396,7 +435,7 @@ int main(void)
 
     clock_t verification_end = clock();
     double verification_time_spent = (double)(verification_end - verification_begin) / CLOCKS_PER_SEC;
-    fprintf(timing_file, "verify_signature(): %lf\n", verification_time_spent);
+    fprintf(timing_file, "verify_signature(): %lf\n", verification_time_spent)  ;
 
     nmod_mat_clear(H_A);
     nmod_mat_clear(F);
