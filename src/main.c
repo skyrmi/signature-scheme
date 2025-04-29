@@ -265,7 +265,7 @@ void generate_signature(nmod_mat_t bin_hash, const unsigned char *message, size_
         }
 
         nmod_mat_mul(signature, bin_hash, G_star);
-    } while (weight(signature) < C_A.t);
+    } while (weight(signature) < 2 * C_A.t + 1);
     
     nmod_mat_clear(G_star);
     nmod_mat_clear(G_star_T);
@@ -274,13 +274,6 @@ void generate_signature(nmod_mat_t bin_hash, const unsigned char *message, size_
 void verify_signature(nmod_mat_t bin_hash, size_t message_len,
     unsigned long sig_len, nmod_mat_t signature, nmod_mat_t F,
     struct code C_A, nmod_mat_t H_A, FILE *output_file)  {
-    
-    // nmod_mat_t hash_T;
-    // nmod_mat_init(hash_T, message_len, 1, MOD);
-    // for (size_t i = 0; i < message_len; ++i) {
-    //     int val =  hash[i % hash_size] % 2;
-    //     nmod_mat_set_entry(hash_T, i, 0, val);
-    // }
 
     nmod_mat_t hash_T;
     nmod_mat_init(hash_T, message_len, 1, MOD);
