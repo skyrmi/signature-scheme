@@ -298,6 +298,7 @@ int main(void)
     nmod_mat_clear(H_A);
     nmod_mat_clear(F);
     nmod_mat_clear(signature);
+    nmod_mat_clear(bin_hash);
     fclose(output_file);
 
     clock_t end = clock();
