@@ -146,7 +146,7 @@ void get_user_input(Params *g1, Params *g2, char **message, size_t *message_len)
 // Getter functions
 uint32_t get_H_A_n(void) { return G1.n + G2.n; }
 uint32_t get_H_A_k(void) { return G1.k; }
-uint32_t get_H_A_d(void) { return G1.d + G2.d - 1; }
+uint32_t get_H_A_d(void) { return G1.d + G2.d + 1; }
 uint32_t get_G1_n(void) { return G1.n; }
 uint32_t get_G1_k(void) { return G1.k; }
 uint32_t get_G1_d(void) { return G1.d; }
