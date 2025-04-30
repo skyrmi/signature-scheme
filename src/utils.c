@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdlib.h>
 #include <sodium.h>
 #include <flint/flint.h>
@@ -14,6 +15,15 @@ static int compare_ints(const void* a, const void* b) {
     if (arg1 < arg2) return -1;
     if (arg1 > arg2) return 1;
     return 0;
+}
+
+double binary_entropy(double p) {
+    if (p <= 0 || p >= 1) {
+        // If p is 0 or 1, the entropy is 0, because there's no uncertainty
+        return 0;
+    }
+    // Calculate entropy using the formula
+    return -p * log2(p) - (1 - p) * log2(1 - p);
 }
 
 // Fisher Yates shuffle

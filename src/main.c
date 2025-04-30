@@ -16,7 +16,7 @@
 #define OUTPUT_PATH "output.txt"
 
 struct code {
-    unsigned long n, k, t;
+    unsigned long n, k, d;
 };
 
 // Check if a vector is in the span of a matrix 
@@ -140,7 +140,7 @@ void create_generator_matrix(slong n, slong k, slong d, nmod_mat_t gen_matrix, F
     flint_rand_t state;
     flint_randinit(state);
     // Generate a full-rank random matrix of size (k, n-k)
-    nmod_mat_randrank(full_rank_matrix, state, k);
+    nmod_mat_randtest(full_rank_matrix, state);
 
     // Set the identity part in the first k columns of the generator matrix
     for (slong current_row = 0; current_row < k; current_row++) { 
@@ -197,9 +197,6 @@ void generate_signature(nmod_mat_t bin_hash, const unsigned char *message, size_
     generate_random_set(C_A.n, C1.n, J);
 
     if (PRINT) {
-        // fprintf(output_file, "\nHash:\n\n");
-        // print_matrix(output_file, bin_hash);
-        
         fprintf(output_file, "\nRandom permutation: ");
         for (int i = 0; i < C1.n; ++i) {
             fprintf(output_file, "%lu ", J[i]);
@@ -265,7 +262,12 @@ void generate_signature(nmod_mat_t bin_hash, const unsigned char *message, size_
         }
 
         nmod_mat_mul(signature, bin_hash, G_star);
-    } while (weight(signature) < 2 * C_A.t + 1);
+    } while (weight(signature) < C_A.d);
+
+    if (PRINT) {
+        fprintf(output_file, "\nHash:\n\n");
+        print_matrix(output_file, bin_hash);
+    }
     
     nmod_mat_clear(G_star);
     nmod_mat_clear(G_star_T);
@@ -278,7 +280,7 @@ void verify_signature(nmod_mat_t bin_hash, size_t message_len,
     nmod_mat_t hash_T;
     nmod_mat_init(hash_T, message_len, 1, MOD);
     nmod_mat_transpose(hash_T, bin_hash);
-    
+
     if (PRINT) {
         fprintf(output_file, "\nHash:\n\n");
         print_matrix(output_file, hash_T);
@@ -288,7 +290,6 @@ void verify_signature(nmod_mat_t bin_hash, size_t message_len,
     nmod_mat_init(left, F->r, 1, MOD);
 
     nmod_mat_mul(left, F, hash_T);
-    fprintf(output_file, "\nLHS:\n\n");
     print_matrix(output_file, left);
 
     nmod_mat_t sig_T;
@@ -381,20 +382,20 @@ int main(void)
 
     fprintf(output_file, "\n-----------Key Generation-----------\n");
     clock_t keygen_begin = clock();
-    struct code C_A = {get_H_A_n(), get_H_A_k(), get_H_A_d()};
+    struct code C_A = {get_H_A_n(), get_H_A_n() * (1 - binary_entropy((double) get_H_A_d() / get_H_A_n())), get_H_A_d()};
     nmod_mat_t H_A;
     nmod_mat_init(H_A, C_A.n - C_A.k, C_A.n, MOD);
-    get_or_generate_matrix("H", C_A.n, C_A.k, C_A.t, H_A, generate_parity_check_matrix, output_file, regenerate);
+    get_or_generate_matrix("H", C_A.n, C_A.k, C_A.d, H_A, generate_parity_check_matrix, output_file, regenerate);
 
     struct code C1 = {get_G1_n(), get_G1_k(), get_G1_d()};
     nmod_mat_t G1;
     nmod_mat_init(G1, C1.k, C1.n, MOD);
-    get_or_generate_matrix("G", C1.n, C1.k, C1.t, G1, create_generator_matrix, output_file, regenerate);
+    get_or_generate_matrix("G", C1.n, C1.k, C1.d, G1, create_generator_matrix, output_file, regenerate);
 
     struct code C2 = {get_G2_n(), get_G2_k(), get_G2_d()};
     nmod_mat_t G2;
     nmod_mat_init(G2, C2.k, C2.n, MOD);
-    get_or_generate_matrix("G", C2.n, C2.k, C2.t, G2, create_generator_matrix, output_file, regenerate);
+    get_or_generate_matrix("G", C2.n, C2.k, C2.d, G2, create_generator_matrix, output_file, regenerate);
 
     if (PRINT) {
         fprintf(output_file, "\nParity check matrix, H_A:\n\n");
@@ -414,7 +415,7 @@ int main(void)
 
     fprintf(output_file, "\nMessage: %s\n", message);
     nmod_mat_t F;
-    nmod_mat_init(F, C_A.n - C_A.k, C_A.k, MOD);
+    nmod_mat_init(F, C_A.n - C_A.k, C1.k, MOD);
 
     nmod_mat_t signature;
     nmod_mat_init(signature, 1, C_A.n, MOD);

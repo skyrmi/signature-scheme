@@ -64,29 +64,47 @@ static void get_param_input(Params *p, const char *name) {
 }
 
 void get_user_input(Params *g1, Params *g2, char **message, size_t *message_len) {
-    if (get_yes_no_input("Do you want to input G1 parameters?")) {
-        get_param_input(g1, "G1");
-    } else {
-        generate_random_params(g1);
-        printf("G1 parameters randomly generated.\n");
-    }
+    if (get_yes_no_input("Do you want to use a BCH code?")) {
+        unsigned int m, t;
+        printf("m: ");
+        scanf("%u", &m);
+        printf("t: ");
+        scanf("%u", &t);
 
-    if (get_yes_no_input("Do you want to input G2 parameters?")) {
-        get_param_input(g2, "G2");
-        if (g1->k != g2->k) {
-            fprintf(stderr, "Different k values, setting G2->k to %u\n", g1->k);
-            g2->k = g1->k;
-        }
+        unsigned int n = (1 << m) - 1;
+        unsigned int d = 2 * t + 1;
+        unsigned int k = m * t;
+
+        g1->n = g2->n = n;
+        g1->k = g2->k = k;
+        g1->d = g2->d = d;
+
+        // printf("BCH parameters set: n = %u, k = %u, d = %u\n", n, k, d);
     } else {
-        generate_random_params(g2);
-        g2->k = g1->k;
-        printf("G2 parameters randomly generated.\n");
+        if (get_yes_no_input("Do you want to input G1 parameters?")) {
+            get_param_input(g1, "G1");
+        } else {
+            generate_random_params(g1);
+            printf("G1 parameters randomly generated.\n");
+        }
+
+        if (get_yes_no_input("Do you want to input G2 parameters?")) {
+            get_param_input(g2, "G2");
+            if (g1->k != g2->k) {
+                fprintf(stderr, "Different k values, setting G2->k to %u\n", g1->k);
+                g2->k = g1->k;
+            }
+        } else {
+            generate_random_params(g2);
+            g2->k = g1->k;
+            printf("G2 parameters randomly generated.\n");
+        }
     }
 
     if (get_yes_no_input("Do you want to input a custom message?")) {
         printf("Enter your message (length same as g1->k): ");
         char buffer[g1->k + 1];
-        getchar();
+        getchar();  // Clear newline
 
         if (fgets(buffer, sizeof(buffer), stdin) == NULL) {
             fprintf(stderr, "Could not read custom message\n");
@@ -94,6 +112,8 @@ void get_user_input(Params *g1, Params *g2, char **message, size_t *message_len)
         }
 
         *message_len = strlen(buffer);
+        if (buffer[*message_len - 1] == '\n') buffer[--(*message_len)] = '\0';
+
         *message = malloc(*message_len + 1);
         if (*message == NULL) {
             fprintf(stderr, "Memory allocation failed\n");
@@ -102,13 +122,12 @@ void get_user_input(Params *g1, Params *g2, char **message, size_t *message_len)
         strcpy(*message, buffer);
     } else {
         char random_message[g1->k + 1];
-
         for (size_t i = 0; i < g1->k; ++i) {
-            random_message[i] = random_range(65, 90);
+            random_message[i] = random_range(65, 90); // A-Z
         }
         random_message[g1->k] = '\0';
 
-        *message_len = strlen(random_message);
+        *message_len = g1->k;
         *message = malloc(*message_len + 1);
         if (*message == NULL) {
             fprintf(stderr, "Memory allocation failed\n");
@@ -127,7 +146,7 @@ void get_user_input(Params *g1, Params *g2, char **message, size_t *message_len)
 // Getter functions
 uint32_t get_H_A_n(void) { return G1.n + G2.n; }
 uint32_t get_H_A_k(void) { return G1.k; }
-uint32_t get_H_A_d(void) { return G1.d + G2.d; }
+uint32_t get_H_A_d(void) { return G1.d + G2.d - 1; }
 uint32_t get_G1_n(void) { return G1.n; }
 uint32_t get_G1_k(void) { return G1.k; }
 uint32_t get_G1_d(void) { return G1.d; }
