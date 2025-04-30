@@ -27,7 +27,7 @@ void create_generator_matrix(slong n, slong k, slong d, nmod_mat_t gen_matrix, F
     nmod_mat_init(gen_matrix, k, n, MOD);
     nmod_mat_randtest(gen_matrix, state);
 
-    flint_randclear(state);
+    flint_rand_clear(state);
 }
 
 void generate_parity_check_matrix(slong n, slong k, slong d, nmod_mat_t H, FILE *output_file) {
@@ -35,7 +35,7 @@ void generate_parity_check_matrix(slong n, slong k, slong d, nmod_mat_t H, FILE 
     flint_randinit(state);
     
     nmod_mat_randtest(H, state);
-    flint_randclear(state);
+    flint_rand_clear(state);
 }
 
 void generate_signature(nmod_mat_t bin_hash, const unsigned char *message, size_t message_len,
@@ -195,11 +195,11 @@ void get_or_generate_matrix(const char* prefix, int n, int k, int d, nmod_mat_t 
     }
 
     if (!regenerate && load_matrix(filename, matrix)) {
-        fprintf(output_file, "Loaded %s matrix from cache.\n", prefix);
+        // fprintf(output_file, "Loaded %s matrix from cache.\n", prefix);
     } else {
         generate_func(n, k, d, matrix, output_file);
         save_matrix(filename, matrix);
-        fprintf(output_file, "Generated and cached %s matrix.\n", prefix);
+        // fprintf(output_file, "Generated and cached %s matrix.\n", prefix);
     }
     free(filename);
 }
