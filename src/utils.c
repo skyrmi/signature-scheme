@@ -17,12 +17,23 @@ static int compare_ints(const void* a, const void* b) {
     return 0;
 }
 
+// Hamming weight
+long weight(nmod_mat_t array) {
+    long weight = 0;
+    for (size_t i = 0; i < array->c; ++i) {
+        if (nmod_mat_get_entry(array, 0, i) == 1) {
+            ++weight;
+        }
+    }
+    return weight;
+}
+
 double binary_entropy(double p) {
     if (p <= 0 || p >= 1) {
         // If p is 0 or 1, the entropy is 0, because there's no uncertainty
         return 0;
     }
-    // Calculate entropy using the formula
+
     return -p * log2(p) - (1 - p) * log2(1 - p);
 }
 

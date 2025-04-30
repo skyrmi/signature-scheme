@@ -19,173 +19,23 @@ struct code {
     unsigned long n, k, d;
 };
 
-// Check if a vector is in the span of a matrix 
-int is_in_span(const nmod_mat_t A, const nmod_mat_t b) { 
-    nmod_mat_t x; 
-    nmod_mat_init(x, b->c, 1, MOD); 
-    int in_span = nmod_mat_can_solve(x, A, b); 
-    nmod_mat_clear(x); 
-    return in_span; 
-} 
-
-// Check if a vector is in the Ball2(n, d-1) 
-bool is_in_ball(const nmod_mat_t v, slong n, slong d) { 
-    slong weight = 0; 
-    for (slong i = 0; i < n; i++) { 
-        weight += nmod_mat_get_entry(v, 0, i); 
-    } 
-    return weight < d; 
-} 
-
-// Minimum distance of matrix using Brouwer-Zimmermann
-int get_distance_from_executable(nmod_mat_t gen_matrix) {
-    FILE *temp_file = fopen("temp_matrix.txt", "w");
-    if (temp_file == NULL) {
-        fprintf(stderr, "Error: Unable to create temporary file\n");
-        exit(1);
-    }
-
-    fprintf(temp_file, "%ld %ld\n", gen_matrix->r, gen_matrix->c);
-    for (size_t i = 0; i < gen_matrix->r; ++i) {
-        for (size_t j = 0; j < gen_matrix->c; ++j) {
-            fprintf(temp_file, " %ld", nmod_mat_get_entry(gen_matrix, i, j));
-        }
-        fprintf(temp_file, "\n");
-    }
-    fclose(temp_file);
-
-    FILE *fp = popen("test_distance temp_matrix.txt", "r");
-    if (fp == NULL) {
-        fprintf(stderr, "Error: Failed to run command\n");
-        exit(1);
-    }
-
-    if (fseek(fp, -128, SEEK_END) != 0) {
-        rewind(fp);
-    }
-
-    char buffer[128];
-    char last_line[128] = "";
-    char second_last_line[128] = "";
-
-    while (fgets(buffer, sizeof(buffer), fp) != NULL) {
-        strcpy(last_line, second_last_line);
-        strcpy(second_last_line, buffer);
-    }
-
-    pclose(fp);
-
-    int distance = 0;
-    if (sscanf(last_line, "Distance of input matrix: %d", &distance) != 1) {
-        fprintf(stderr, "Error: Unable to parse distance from output\n");
-        exit(1);
-    }
-
-    return distance;
-}
-
-
-// original generator matrix creation: relied on minimum distance check
-void old_create_generator_matrix(slong n, slong k, slong d, nmod_mat_t gen_matrix, FILE *output_file) { 
-    // Initialize the generator matrix with [I_k | 0]
-    nmod_mat_init(gen_matrix, k, n, MOD);
-
-    nmod_mat_t v;
-    nmod_mat_init(v, 1, n, MOD);
-
-    for (slong current_row = 0; current_row < k; current_row++) { 
-        // Set the identity part 
-        for (slong i = 0; i < k; i++) { 
-            nmod_mat_set_entry(v, 0, i, (i == current_row) ? 1 : 0); 
-        } 
-        
-        // Find a suitable vector for the remaining n-k elements 
-        bool found = false; 
-        for (slong i = 0; i < (1L << (n-k)); i++) { 
-            for (slong j = 0; j < n-k; j++) { 
-                // nmod_mat_set_entry(v, 0, k+j, (i >> j) & 1);
-                nmod_mat_set_entry(v, 0, k+j, randombytes_uniform(MOD)); 
-            }
-
-            if (!is_in_ball(v, n, d)) {
-                // Add v to generator matrix 
-                for (slong j = 0; j < n; ++j) {
-                    nmod_mat_set_entry(gen_matrix, current_row, j, nmod_mat_get_entry(v, 0, j));
-                }
-
-                // Check if code has minimum distance d
-                int min_distance = get_distance_from_executable(gen_matrix);
-                if (min_distance >= d) {
-                    found = true;
-                    break;
-                }
-            }
-        }
-
-        if (!found) {
-            fprintf(output_file, "Failed to find a suitable vector for row %ld\n", current_row);
-            nmod_mat_clear(v);
-            return;
-        } 
-    } 
-    nmod_mat_clear(v);
-}
-
 // new generator matrix creation: based on Gilbert-Varshamov bound
 void create_generator_matrix(slong n, slong k, slong d, nmod_mat_t gen_matrix, FILE *output_file) { 
-    nmod_mat_init(gen_matrix, k, n, MOD);
-    nmod_mat_t full_rank_matrix;
-    nmod_mat_init(full_rank_matrix, k, n - k, MOD);
-
     flint_rand_t state;
     flint_randinit(state);
-    // Generate a full-rank random matrix of size (k, n-k)
-    nmod_mat_randtest(full_rank_matrix, state);
 
-    // Set the identity part in the first k columns of the generator matrix
-    for (slong current_row = 0; current_row < k; current_row++) { 
-        for (slong i = 0; i < k; i++) { 
-            nmod_mat_set_entry(gen_matrix, current_row, i, (i == current_row) ? 1 : 0); 
-        }
+    nmod_mat_init(gen_matrix, k, n, MOD);
+    nmod_mat_randtest(gen_matrix, state);
 
-        // Copy the corresponding random part from the full-rank matrix
-        for (slong i = k; i < n; i++) {
-            // nmod_mat_set_entry(gen_matrix, current_row, i, nmod_mat_get_entry(full_rank_matrix, current_row, i - k)); 
-            nmod_mat_set_entry(gen_matrix, current_row, i, randombytes_uniform(MOD)); 
-        }
-    }
-
-    nmod_mat_clear(full_rank_matrix); 
+    flint_randclear(state);
 }
 
 void generate_parity_check_matrix(slong n, slong k, slong d, nmod_mat_t H, FILE *output_file) {
-    nmod_mat_t G;
-    nmod_mat_init (G, k, n, MOD);
-    create_generator_matrix(n, k, d, G, output_file);
+    flint_rand_t state;
+    flint_randinit(state);
     
-    nmod_mat_zero(H);
-
-    for (size_t i = 0; i < n - k; ++i) {
-        for (size_t j = 0; j < k; ++j) {
-            nmod_mat_set_entry(H, i, j, nmod_mat_get_entry(G, j, k + i));
-        }
-    }
-
-    for (size_t i = 0; i < n - k; ++i) {
-        nmod_mat_set_entry(H, i, k + i, 1);
-    }
-    
-    nmod_mat_clear(G);
-}
-
-long weight(nmod_mat_t hash) {
-    long weight = 0;
-    for (size_t i = 0; i < hash->c; ++i) {
-        if (nmod_mat_get_entry(hash, 0, i) == 1) {
-            ++weight;
-        }
-    }
-    return weight;
+    nmod_mat_randtest(H, state);
+    flint_randclear(state);
 }
 
 void generate_signature(nmod_mat_t bin_hash, const unsigned char *message, size_t message_len,
