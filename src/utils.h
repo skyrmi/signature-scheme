@@ -1,6 +1,12 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include <math.h>
+#include <stdlib.h>
+#include <sodium.h>
+#include <flint/flint.h>
+#include <flint/nmod_mat.h>
+
 long weight(nmod_mat_t array);
 double binary_entropy(double p);
 void generate_random_set(unsigned long upper_bound, unsigned long size, unsigned long set[size]);

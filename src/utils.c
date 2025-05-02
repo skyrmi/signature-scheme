@@ -1,8 +1,4 @@
-#include <math.h>
-#include <stdlib.h>
-#include <sodium.h>
-#include <flint/flint.h>
-#include <flint/nmod_mat.h>
+#include "utils.h"
 
 #define CACHE_DIR "../matrix_cache/"
 #define MAX_FILENAME_LENGTH 256

@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "utils.h"
 
 typedef struct {
     uint32_t n;
@@ -12,7 +13,7 @@ typedef struct {
 
 void init_params(void);
 bool get_yes_no_input(const char *prompt);
-void get_user_input(Params *g1, Params *g2, char **message, size_t *message_len);
+void get_user_input(Params *g1, Params *g2, Params *h, char **message, size_t *message_len);
 uint32_t random_range(uint32_t min, uint32_t max);
 
 uint32_t get_H_A_n(void);

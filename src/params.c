@@ -4,7 +4,7 @@
 #include <sodium.h>
 #include "params.h"
 
-static Params G1, G2;
+static Params G1, G2, H_A;
 static char *MESSAGE = NULL;
 static size_t MESSAGE_LEN = 0;
 
@@ -63,7 +63,7 @@ static void get_param_input(Params *p, const char *name) {
     } while (p->n <= p->k || p->n <= p->d);
 }
 
-void get_user_input(Params *g1, Params *g2, char **message, size_t *message_len) {
+void get_user_input(Params *g1, Params *g2, Params *h, char **message, size_t *message_len) {
     if (get_yes_no_input("Do you want to use a BCH code?")) {
         unsigned int m, t;
         printf("m: ");
@@ -79,7 +79,9 @@ void get_user_input(Params *g1, Params *g2, char **message, size_t *message_len)
         g1->k = g2->k = k;
         g1->d = g2->d = d;
 
-        // printf("BCH parameters set: n = %u, k = %u, d = %u\n", n, k, d);
+        h->n = g1->n + g2->n;
+        h->d = g1->d + g2->d + 1;
+        h->k = h->n * (1 - binary_entropy((double) h->d / h->n));
     } else {
         if (get_yes_no_input("Do you want to input G1 parameters?")) {
             get_param_input(g1, "G1");
@@ -91,7 +93,7 @@ void get_user_input(Params *g1, Params *g2, char **message, size_t *message_len)
         if (get_yes_no_input("Do you want to input G2 parameters?")) {
             get_param_input(g2, "G2");
             if (g1->k != g2->k) {
-                fprintf(stderr, "Different k values, setting G2->k to %u\n", g1->k);
+                fprintf(stderr, "Different values for k, setting G2->k to %u\n", g1->k);
                 g2->k = g1->k;
             }
         } else {
@@ -99,12 +101,16 @@ void get_user_input(Params *g1, Params *g2, char **message, size_t *message_len)
             g2->k = g1->k;
             printf("G2 parameters randomly generated.\n");
         }
+
+        h->n = g1->n + g2->n;
+        h->k = g1->k;
+        h->d = g1->d + g2->d;
     }
 
     if (get_yes_no_input("Do you want to input a custom message?")) {
         printf("Enter your message (length same as g1->k): ");
         char buffer[g1->k + 1];
-        getchar();  // Clear newline
+        getchar();
 
         if (fgets(buffer, sizeof(buffer), stdin) == NULL) {
             fprintf(stderr, "Could not read custom message\n");
@@ -123,7 +129,7 @@ void get_user_input(Params *g1, Params *g2, char **message, size_t *message_len)
     } else {
         char random_message[g1->k + 1];
         for (size_t i = 0; i < g1->k; ++i) {
-            random_message[i] = random_range(65, 90); // A-Z
+            random_message[i] = random_range(65, 90);
         }
         random_message[g1->k] = '\0';
 
@@ -139,11 +145,11 @@ void get_user_input(Params *g1, Params *g2, char **message, size_t *message_len)
 
     G1 = *g1;
     G2 = *g2;
+    H_A = *h;
     MESSAGE = *message;
     MESSAGE_LEN = *message_len;
 }
 
-// Getter functions
 uint32_t get_H_A_n(void) { return G1.n + G2.n; }
 uint32_t get_H_A_k(void) { return G1.k; }
 uint32_t get_H_A_d(void) { return G1.d + G2.d + 1; }

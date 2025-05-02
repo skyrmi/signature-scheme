@@ -27,7 +27,7 @@ void create_generator_matrix(slong n, slong k, slong d, nmod_mat_t gen_matrix, F
     nmod_mat_init(gen_matrix, k, n, MOD);
     nmod_mat_randtest(gen_matrix, state);
 
-    flint_rand_clear(state);
+    flint_randclear(state);
 }
 
 void generate_parity_check_matrix(slong n, slong k, slong d, nmod_mat_t H, FILE *output_file) {
@@ -35,7 +35,7 @@ void generate_parity_check_matrix(slong n, slong k, slong d, nmod_mat_t H, FILE 
     flint_randinit(state);
     
     nmod_mat_randtest(H, state);
-    flint_rand_clear(state);
+    flint_randclear(state);
 }
 
 void generate_signature(nmod_mat_t bin_hash, const unsigned char *message, size_t message_len,
@@ -140,6 +140,7 @@ void verify_signature(nmod_mat_t bin_hash, size_t message_len,
     nmod_mat_init(left, F->r, 1, MOD);
 
     nmod_mat_mul(left, F, hash_T);
+    fprintf(output_file, "\nLHS:\n\n");
     print_matrix(output_file, left);
 
     nmod_mat_t sig_T;
@@ -195,11 +196,9 @@ void get_or_generate_matrix(const char* prefix, int n, int k, int d, nmod_mat_t 
     }
 
     if (!regenerate && load_matrix(filename, matrix)) {
-        // fprintf(output_file, "Loaded %s matrix from cache.\n", prefix);
     } else {
         generate_func(n, k, d, matrix, output_file);
         save_matrix(filename, matrix);
-        // fprintf(output_file, "Generated and cached %s matrix.\n", prefix);
     }
     free(filename);
 }
@@ -207,12 +206,12 @@ void get_or_generate_matrix(const char* prefix, int n, int k, int d, nmod_mat_t 
 int main(void)
 {
     clock_t begin = clock();
-    Params g1, g2;
+    Params g1, g2, h_a;
     char *msg;
     size_t message_len;
     bool regenerate = true;
 
-    get_user_input(&g1, &g2, &msg, &message_len);
+    get_user_input(&g1, &g2, &h_a, &msg, &message_len);
     if (get_yes_no_input("Use pre-computed matrix if found?")) {
         regenerate = false;
     }
@@ -232,7 +231,8 @@ int main(void)
 
     fprintf(output_file, "\n-----------Key Generation-----------\n");
     clock_t keygen_begin = clock();
-    struct code C_A = {get_H_A_n(), get_H_A_n() * (1 - binary_entropy((double) get_H_A_d() / get_H_A_n())), get_H_A_d()};
+
+    struct code C_A = {get_H_A_n(), get_H_A_k(), get_H_A_d()};
     nmod_mat_t H_A;
     nmod_mat_init(H_A, C_A.n - C_A.k, C_A.n, MOD);
     get_or_generate_matrix("H", C_A.n, C_A.k, C_A.d, H_A, generate_parity_check_matrix, output_file, regenerate);
