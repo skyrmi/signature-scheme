@@ -184,7 +184,6 @@ void combine_generator_matrices(nmod_mat_t G1, nmod_mat_t G2, FILE* output_file)
     nmod_mat_clear(G);
 }
 
-// Function to handle matrix generation or loading
 void get_or_generate_matrix(const char* prefix, int n, int k, int d, nmod_mat_t matrix, 
                             void (*generate_func)(slong, slong, slong, nmod_mat_t, FILE*), 
                             FILE* output_file, bool regenerate) {
@@ -195,6 +194,7 @@ void get_or_generate_matrix(const char* prefix, int n, int k, int d, nmod_mat_t 
     }
 
     if (!regenerate && load_matrix(filename, matrix)) {
+        // matrix loaded
     } else {
         generate_func(n, k, d, matrix, output_file);
         save_matrix(filename, matrix);
@@ -211,7 +211,7 @@ int main(void)
     bool regenerate = true;
 
     get_user_input(&g1, &g2, &h_a, &msg, &message_len);
-    if (get_yes_no_input("Use pre-computed matrix if found?")) {
+    if (get_yes_no_input("Use matrices from cache?")) {
         regenerate = false;
     }
 

@@ -179,6 +179,10 @@ void get_user_input(Params *g1, Params *g2, Params *h, char **message, size_t *m
     H_A = *h;
     MESSAGE = *message;
     MESSAGE_LEN = *message_len;
+
+    printf("\nC1 parameters: %u %u %u", g1->n, g1->k, g1->d);
+    printf("\nC1 parameters: %u %u %u", g2->n, g2->k, g2->d);
+    printf("\nC_A parameters: %u %u %u\n\n", h->n, h->k, h->d);
 }
 
 uint32_t get_H_A_n(void) { return H_A.n; }
