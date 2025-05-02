@@ -107,25 +107,56 @@ void get_user_input(Params *g1, Params *g2, Params *h, char **message, size_t *m
         h->d = g1->d + g2->d;
     }
 
-    if (get_yes_no_input("Do you want to input a custom message?")) {
-        printf("Enter your message (length same as g1->k): ");
-        char buffer[g1->k + 1];
-        getchar();
-
-        if (fgets(buffer, sizeof(buffer), stdin) == NULL) {
-            fprintf(stderr, "Could not read custom message\n");
+    if (get_yes_no_input("Do you want to input a message from a file?")) {
+        char filename[256] = "MSG";
+        printf("Enter the file path (leave empty for default 'MSG'): ");
+    
+        getchar(); 
+    
+        if (fgets(filename, sizeof(filename), stdin) != NULL) {
+            size_t len = strlen(filename);
+            if (len > 0 && filename[len - 1] == '\n') {
+                filename[len - 1] = '\0';
+            }
+            if (strlen(filename) == 0) {
+                strcpy(filename, "MSG");
+            }
+        }
+    
+        FILE *fp = fopen(filename, "r");
+        if (fp == NULL) {
+            fprintf(stderr, "Could not open file: %s\n", filename);
             exit(EXIT_FAILURE);
         }
-
+    
+        char *buffer = malloc(g1->k + 1);
+        if (buffer == NULL) {
+            fprintf(stderr, "Memory allocation failed\n");
+            fclose(fp);
+            exit(EXIT_FAILURE);
+        }
+    
+        if (fgets(buffer, g1->k + 1, fp) == NULL) {
+            fprintf(stderr, "Could not read message from file\n");
+            free(buffer);
+            fclose(fp);
+            exit(EXIT_FAILURE);
+        }
+    
         *message_len = strlen(buffer);
         if (buffer[*message_len - 1] == '\n') buffer[--(*message_len)] = '\0';
-
+    
         *message = malloc(*message_len + 1);
         if (*message == NULL) {
             fprintf(stderr, "Memory allocation failed\n");
-            exit(1);
+            free(buffer);
+            fclose(fp);
+            exit(EXIT_FAILURE);
         }
+    
         strcpy(*message, buffer);
+        free(buffer);
+        fclose(fp);
     } else {
         char random_message[g1->k + 1];
         for (size_t i = 0; i < g1->k; ++i) {
@@ -150,9 +181,9 @@ void get_user_input(Params *g1, Params *g2, Params *h, char **message, size_t *m
     MESSAGE_LEN = *message_len;
 }
 
-uint32_t get_H_A_n(void) { return G1.n + G2.n; }
-uint32_t get_H_A_k(void) { return G1.k; }
-uint32_t get_H_A_d(void) { return G1.d + G2.d + 1; }
+uint32_t get_H_A_n(void) { return H_A.n; }
+uint32_t get_H_A_k(void) { return H_A.k; }
+uint32_t get_H_A_d(void) { return H_A.d; }
 uint32_t get_G1_n(void) { return G1.n; }
 uint32_t get_G1_k(void) { return G1.k; }
 uint32_t get_G1_d(void) { return G1.d; }

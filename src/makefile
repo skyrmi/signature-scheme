@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -g -O3 -I/usr/bin/include/
 LDFLAGS = -L/usr/bin/lib/
-LDLIBS = -lflint -lgmp -lmpfr -lsodium
+LDLIBS = -lflint -lgmp -lmpfr -lsodium -lm
 
 TARGET = main
 SRCS = matrix.c utils.c params.c main.c 

@@ -19,7 +19,6 @@ struct code {
     unsigned long n, k, d;
 };
 
-// new generator matrix creation: based on Gilbert-Varshamov bound
 void create_generator_matrix(slong n, slong k, slong d, nmod_mat_t gen_matrix, FILE *output_file) { 
     flint_rand_t state;
     flint_randinit(state);
