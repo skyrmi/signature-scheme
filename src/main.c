@@ -14,10 +14,99 @@
 #define PRINT true
 #define MOD 2
 #define OUTPUT_PATH "output.txt"
+#define SEED_SIZE 32
 
 struct code {
     unsigned long n, k, d;
 };
+
+void generate_random_seed(unsigned char *seed) {
+    randombytes_buf(seed, SEED_SIZE);
+}
+
+void create_generator_matrix_from_seed(slong n, slong k, slong d,
+                                       nmod_mat_t gen_matrix,
+                                       const unsigned char *seed,
+                                       FILE *output_file) {
+
+    size_t num_entries = k * n;
+    size_t total_bytes = num_entries * sizeof(uint32_t);
+    unsigned char *stream = malloc(total_bytes);
+    if (!stream) {
+        fprintf(stderr, "Failed to allocate stream buffer\n");
+        return;
+    }
+
+    // this uses ChaCha20 under the hood
+    randombytes_buf_deterministic(stream, total_bytes, seed);
+
+    for (slong i = 0; i < k; ++i) {
+        for (slong j = 0; j < n; ++j) {
+            size_t idx = (i * n + j) * sizeof(uint32_t);
+            uint32_t value = 0;
+            for (int b = 0; b < 4; ++b) {
+                value |= ((uint32_t)stream[idx + b]) << (8 * b);
+            }
+            nmod_mat_set_entry(gen_matrix, i, j, value % MOD);
+        }
+    }
+
+    free(stream);
+}
+
+void generate_parity_check_matrix_from_seed(slong n, slong k, slong d, nmod_mat_t H, 
+                                           const unsigned char *seed, FILE *output_file) {
+
+    size_t num_entries = (n - k) * n;
+    size_t total_bytes = num_entries * sizeof(uint32_t);
+    unsigned char *stream = malloc(total_bytes);
+    if (!stream) {
+        fprintf(stderr, "Failed to allocate stream buffer\n");
+        return;
+    }
+
+    // this uses ChaCha20 under the hood
+    randombytes_buf_deterministic(stream, total_bytes, seed);
+
+    for (slong i = 0; i < n - k; ++i) {
+        for (slong j = 0; j < n; ++j) {
+            size_t idx = (i * n + j) * sizeof(uint32_t);
+            uint32_t value = 0;
+            for (int b = 0; b < 4; ++b) {
+                value |= ((uint32_t)stream[idx + b]) << (8 * b);
+            }
+            nmod_mat_set_entry(H, i, j, value % MOD);
+        }
+    }
+
+    free(stream);
+}
+
+char* generate_seed_filename(const char* prefix, int n, int k, int d) {
+    char* filename = malloc(256);
+    if (filename) {
+        snprintf(filename, 256, "../matrix_cache/%s_%d_%d_%d_seed.bin", prefix, n, k, d);
+    }
+    return filename;
+}
+
+bool save_seed(const char* filename, const unsigned char *seed) {
+    FILE *file = fopen(filename, "wb");
+    if (!file) return false;
+    
+    size_t written = fwrite(seed, 1, SEED_SIZE, file);
+    fclose(file);
+    return written == SEED_SIZE;
+}
+
+bool load_seed(const char* filename, unsigned char *seed) {
+    FILE *file = fopen(filename, "rb");
+    if (!file) return false;
+    
+    size_t read = fread(seed, 1, SEED_SIZE, file);
+    fclose(file);
+    return read == SEED_SIZE;
+}
 
 void create_generator_matrix(slong n, slong k, slong d, nmod_mat_t gen_matrix, FILE *output_file) { 
     flint_rand_t state;
@@ -184,22 +273,45 @@ void combine_generator_matrices(nmod_mat_t G1, nmod_mat_t G2, FILE* output_file)
     nmod_mat_clear(G);
 }
 
-void get_or_generate_matrix(const char* prefix, int n, int k, int d, nmod_mat_t matrix, 
-                            void (*generate_func)(slong, slong, slong, nmod_mat_t, FILE*), 
-                            FILE* output_file, bool regenerate) {
-    char* filename = generate_matrix_filename(prefix, n, k, d);
-    if (filename == NULL) {
-        fprintf(stderr, "Failed to generate filename\n");
-        return;
-    }
+void get_or_generate_matrix_with_seed(const char* prefix, int n, int k, int d, nmod_mat_t matrix,
+                                     void (*generate_func)(slong, slong, slong, nmod_mat_t, FILE*),
+                                     void (*generate_from_seed_func)(slong, slong, slong, nmod_mat_t, const unsigned char*, FILE*),
+                                     FILE* output_file, bool regenerate, bool use_seed_mode, 
+                                     unsigned char *seed_out) {
+    if (use_seed_mode) {
+        char* seed_filename = generate_seed_filename(prefix, n, k, d);
+        if (seed_filename == NULL) {
+            fprintf(stderr, "Failed to generate seed filename\n");
+            return;
+        }
 
-    if (!regenerate && load_matrix(filename, matrix)) {
-        // matrix loaded
+        unsigned char seed[SEED_SIZE];
+        
+        if (!regenerate && load_seed(seed_filename, seed)) {
+            generate_from_seed_func(n, k, d, matrix, seed, output_file);
+            if (seed_out) memcpy(seed_out, seed, SEED_SIZE);
+        } else {
+            generate_random_seed(seed);
+            save_seed(seed_filename, seed);
+            generate_from_seed_func(n, k, d, matrix, seed, output_file);
+            if (seed_out) memcpy(seed_out, seed, SEED_SIZE);
+        }
+        free(seed_filename);
     } else {
-        generate_func(n, k, d, matrix, output_file);
-        save_matrix(filename, matrix);
+        char* filename = generate_matrix_filename(prefix, n, k, d);
+        if (filename == NULL) {
+            fprintf(stderr, "Failed to generate filename\n");
+            return;
+        }
+
+        if (!regenerate && load_matrix(filename, matrix)) {
+            // matrix loaded
+        } else {
+            generate_func(n, k, d, matrix, output_file);
+            save_matrix(filename, matrix);
+        }
+        free(filename);
     }
-    free(filename);
 }
 
 int main(void)
@@ -209,10 +321,15 @@ int main(void)
     char *msg;
     size_t message_len;
     bool regenerate = true;
+    bool use_seed_mode = false;
 
     get_user_input(&g1, &g2, &h_a, &msg, &message_len);
     if (get_yes_no_input("Use matrices from cache?")) {
         regenerate = false;
+    }
+
+    if (get_yes_no_input("Use seed-based key generation?")) {
+        use_seed_mode = true;
     }
 
     const unsigned char* message = get_MESSAGE();
@@ -221,30 +338,65 @@ int main(void)
 
     char timing_filename[256];
     char G1_file[256], G2_file[256];
-    sprintf(G1_file, "../matrix_cache/G_%u_%u_%u.txt", get_G1_n(), get_G1_k(), get_G1_d());
-    sprintf(G2_file, "../matrix_cache/G_%u_%u_%u.txt", get_G2_n(), get_G2_k(), get_G2_d());
-    sprintf(timing_filename, "../timing/G1_%u_%u_%u_G2_%u_%u_%u_%s.txt", 
+    if (use_seed_mode) {
+        sprintf(G1_file, "../matrix_cache/G_%u_%u_%u_seed.bin", get_G1_n(), get_G1_k(), get_G1_d());
+        sprintf(G2_file, "../matrix_cache/G_%u_%u_%u_seed.bin", get_G2_n(), get_G2_k(), get_G2_d());
+    } else {
+        sprintf(G1_file, "../matrix_cache/G_%u_%u_%u.txt", get_G1_n(), get_G1_k(), get_G1_d());
+        sprintf(G2_file, "../matrix_cache/G_%u_%u_%u.txt", get_G2_n(), get_G2_k(), get_G2_d());
+    }
+    
+    sprintf(timing_filename, "../timing/G1_%u_%u_%u_G2_%u_%u_%u_%s_%s.txt", 
         get_G1_n(), get_G1_k(), get_G1_d(), get_G2_n(), get_G2_k(), get_G2_d(),
-             (file_exists(G1_file) && file_exists(G2_file) && !regenerate) ? "stored" : "generated");
+        (file_exists(G1_file) && file_exists(G2_file) && !regenerate) ? "stored" : "generated",
+        use_seed_mode ? "seed" : "matrix");
     FILE *timing_file = fopen(timing_filename, "w");
 
     fprintf(output_file, "\n-----------Key Generation-----------\n");
     clock_t keygen_begin = clock();
 
+    unsigned char h_a_seed[SEED_SIZE];
+    unsigned char g1_seed[SEED_SIZE];
+    unsigned char g2_seed[SEED_SIZE];
+
     struct code C_A = {get_H_A_n(), get_H_A_k(), get_H_A_d()};
     nmod_mat_t H_A;
     nmod_mat_init(H_A, C_A.n - C_A.k, C_A.n, MOD);
-    get_or_generate_matrix("H", C_A.n, C_A.k, C_A.d, H_A, generate_parity_check_matrix, output_file, regenerate);
+    get_or_generate_matrix_with_seed("H", C_A.n, C_A.k, C_A.d, H_A, 
+                                    generate_parity_check_matrix, generate_parity_check_matrix_from_seed,
+                                    output_file, regenerate, use_seed_mode, h_a_seed);
+
 
     struct code C1 = {get_G1_n(), get_G1_k(), get_G1_d()};
     nmod_mat_t G1;
     nmod_mat_init(G1, C1.k, C1.n, MOD);
-    get_or_generate_matrix("G", C1.n, C1.k, C1.d, G1, create_generator_matrix, output_file, regenerate);
+    get_or_generate_matrix_with_seed("G", C1.n, C1.k, C1.d, G1, 
+                                    create_generator_matrix, create_generator_matrix_from_seed,
+                                    output_file, regenerate, use_seed_mode, g1_seed);
 
     struct code C2 = {get_G2_n(), get_G2_k(), get_G2_d()};
     nmod_mat_t G2;
     nmod_mat_init(G2, C2.k, C2.n, MOD);
-    get_or_generate_matrix("G", C2.n, C2.k, C2.d, G2, create_generator_matrix, output_file, regenerate);
+    get_or_generate_matrix_with_seed("G", C2.n, C2.k, C2.d, G2, 
+                                    create_generator_matrix, create_generator_matrix_from_seed,
+                                    output_file, regenerate, use_seed_mode, g2_seed);
+
+    if (use_seed_mode && PRINT) {
+        fprintf(output_file, "\nUsing seed-based key generation\n");
+        fprintf(output_file, "H_A seed: ");
+        for (int i = 0; i < SEED_SIZE; i++) {
+            fprintf(output_file, "%02x", h_a_seed[i]);
+        }
+        fprintf(output_file, "\nG1 seed: ");
+        for (int i = 0; i < SEED_SIZE; i++) {
+            fprintf(output_file, "%02x", g1_seed[i]);
+        }
+        fprintf(output_file, "\nG2 seed: ");
+        for (int i = 0; i < SEED_SIZE; i++) {
+            fprintf(output_file, "%02x", g2_seed[i]);
+        }
+        fprintf(output_file, "\n");
+    }
 
     if (PRINT) {
         fprintf(output_file, "\nParity check matrix, H_A:\n\n");
