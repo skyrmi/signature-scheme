@@ -1,8 +1,8 @@
+#include <stdbool.h>
+#include <string.h>
+#include "params.h"
 #include "utils.h"
-
-#define CACHE_DIR "../matrix_cache/"
-#define MAX_FILENAME_LENGTH 256
-#define MOD 2
+#include "constants.h"
 
 static int compare_ints(const void* a, const void* b) {
     int arg1 = *(const int*) a;
@@ -127,4 +127,136 @@ int file_exists(const char* filename) {
     }
     fclose(file);
     return 1;
+}
+
+char* generate_seed_filename(const char* prefix, int n, int k, int d) {
+    char* filename = malloc(MAX_FILENAME_LENGTH);
+    if (filename) {
+        snprintf(filename, MAX_FILENAME_LENGTH, "%s/%s_%d_%d_%d_seed.bin", CACHE_DIR, prefix, n, k, d);
+    }
+    return filename;
+}
+
+bool save_seed(const char* filename, const unsigned char *seed) {
+    FILE *file = fopen(filename, "wb");
+    if (!file) return false;
+    
+    size_t written = fwrite(seed, 1, SEED_SIZE, file);
+    fclose(file);
+    return written == SEED_SIZE;
+}
+
+bool load_seed(const char* filename, unsigned char *seed) {
+    FILE *file = fopen(filename, "rb");
+    if (!file) return false;
+    
+    size_t read = fread(seed, 1, SEED_SIZE, file);
+    fclose(file);
+    return read == SEED_SIZE;
+}
+
+char *read_file(const char *filename) {
+    FILE *fp = fopen(filename, "r");
+    if (!fp) {
+        fprintf(stderr, "Error: could not open file: %s\n", filename);
+        return NULL;
+    }
+
+    fseek(fp, 0, SEEK_END);
+    long length = ftell(fp);
+    rewind(fp);
+
+    if (length <= 0) {
+        fprintf(stderr, "Error: file is empty or unreadable: %s\n", filename);
+        fclose(fp);
+        return NULL;
+    }
+
+    char *buffer = malloc(length + 1);
+    if (!buffer) {
+        fprintf(stderr, "Memory allocation failed\n");
+        fclose(fp);
+        return NULL;
+    }
+
+    size_t read = fread(buffer, 1, length, fp);
+    fclose(fp);
+
+    buffer[read] = '\0';
+    return buffer;
+}
+
+
+char *read_file_or_generate(const char *filename, int msg_len) {
+    FILE *fp = fopen(filename, "r");
+    if (fp) {
+        fseek(fp, 0, SEEK_END);
+        long length = ftell(fp);
+        rewind(fp);
+
+        if (length <= 0) {
+            fprintf(stderr, "Warning: file is empty, generating message instead.\n");
+            fclose(fp);
+        } else {
+            char *buffer = malloc(length + 1);
+            if (!buffer) {
+                fprintf(stderr, "Memory allocation failed\n");
+                fclose(fp);
+                return NULL;
+            }
+
+            size_t read = fread(buffer, 1, length, fp);
+            buffer[read] = '\0';
+            fclose(fp);
+            return buffer;
+        }
+    }
+
+    // Fallback: generate message
+    char *msg = malloc(msg_len + 1);
+    if (!msg) {
+        fprintf(stderr, "Memory allocation failed for fallback message\n");
+        return NULL;
+    }
+
+    for (int i = 0; i < msg_len; ++i) {
+        msg[i] = random_range(65, 90);  // A-Z
+    }
+    msg[msg_len] = '\0';
+
+    FILE *fout = fopen(filename, "w");
+    if (fout) {
+        fwrite(msg, 1, msg_len, fout);
+        fclose(fout);
+        printf("No valid message file found. Generated random message saved to '%s'\n", filename);
+    } else {
+        fprintf(stderr, "Warning: could not write fallback message to file.\n");
+    }
+
+    return msg;
+}
+
+bool load_params(struct code *C_A, struct code *C1, struct code *C2) {
+    FILE *file = fopen("params.txt", "r");
+    if (!file) {
+        fprintf(stderr, "Error: Could not open params.txt\n");
+        return false;
+    }
+
+    char key[16];
+    unsigned long val;
+    while (fscanf(file, "%15s %lu", key, &val) == 2) {
+        if      (strcmp(key, "H_A_n") == 0) C_A->n = val;
+        else if (strcmp(key, "H_A_k") == 0) C_A->k = val;
+        else if (strcmp(key, "H_A_d") == 0) C_A->d = val;
+        else if (strcmp(key, "G1_n") == 0)  C1->n = val;
+        else if (strcmp(key, "G1_k") == 0)  C1->k = val;
+        else if (strcmp(key, "G1_d") == 0)  C1->d = val;
+        else if (strcmp(key, "G2_n") == 0)  C2->n = val;
+        else if (strcmp(key, "G2_k") == 0)  C2->k = val;
+        else if (strcmp(key, "G2_d") == 0)  C2->d = val;
+    }
+
+    fclose(file);
+    return true;
 }

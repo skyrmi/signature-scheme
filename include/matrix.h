@@ -1,6 +1,10 @@
 #ifndef MATRIX_H
 #define MATRIX_H
 
+struct code {
+    unsigned long n, k, d;
+};
+
 void print_matrix(FILE *fp, nmod_mat_t matrix);
 void transpose_matrix(int rows, int cols, int matrix[rows][cols], int transpose[cols][rows]);
 void multiply_matrices_gf2(nmod_mat_t C, const nmod_mat_t A, const nmod_mat_t B);

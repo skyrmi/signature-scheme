@@ -3,6 +3,7 @@
 #include <string.h>
 #include <sodium.h>
 #include "params.h"
+#include "constants.h"
 
 static Params G1, G2, H_A;
 static char *MESSAGE = NULL;
@@ -108,7 +109,7 @@ void get_user_input(Params *g1, Params *g2, Params *h, char **message, size_t *m
     }
 
     if (get_yes_no_input("Do you want to input a message from a file?")) {
-        char filename[256] = "MSG";
+        char filename[MAX_FILENAME_LENGTH] = "MSG";
         printf("Enter the file path (leave empty for default 'MSG'): ");
     
         getchar(); 
