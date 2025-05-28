@@ -65,11 +65,8 @@ static void get_param_input(Params *p, const char *name) {
 }
 
 void get_user_input(Params *g1, Params *g2, Params *h) {
-    char path[MAX_FILENAME_LENGTH];
-    snprintf(path, sizeof(path), "%s/params.txt", OUTPUT_DIR);
-
     bool param_choice = false;
-    FILE *param_file = fopen(path, "r");
+    FILE *param_file = fopen(PARAM_PATH, "r");
     if (param_file) {
 
         if ((param_choice = get_yes_no_input("Saved parameter file params.txt found, use it?"))) {
@@ -129,7 +126,7 @@ void get_user_input(Params *g1, Params *g2, Params *h) {
         h->d = g1->d + g2->d;
     }
 
-    param_file = fopen(path, "w");
+    param_file = fopen(PARAM_PATH, "w");
     if (param_file) {
         fprintf(param_file, "H_A_n %u\n", h->n);
         fprintf(param_file, "H_A_k %u\n", h->k);

@@ -253,10 +253,7 @@ char *read_file_or_generate(const char *filename, int msg_len) {
 }
 
 bool load_params(struct code *C_A, struct code *C1, struct code *C2) {
-    char path[MAX_FILENAME_LENGTH];
-    snprintf(path, sizeof(path), "%s/params.txt", OUTPUT_DIR);
-
-    FILE *file = fopen(path, "r");
+    FILE *file = fopen(PARAM_PATH, "r");
     if (!file) {
         fprintf(stderr, "Error: Could not open params.txt\n");
         return false;
