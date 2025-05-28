@@ -57,3 +57,5 @@ dkms.conf
 .DS_STORE
 main
 output
+params.txt
+message.txt
