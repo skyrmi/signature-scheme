@@ -22,5 +22,8 @@ bool load_seed(const char* filename, unsigned char *seed);
 char *read_file(const char *filename);
 char *read_file_or_generate(const char *filename, int msg_len);
 bool load_params(struct code *C_A, struct code *C1, struct code *C2);
+void ensure_matrix_cache();
+void ensure_output_directory();
+char *normalize_message_length(const char *msg, size_t msg_len, size_t target_len, size_t *final_len_out);
 
 #endif

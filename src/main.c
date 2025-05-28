@@ -9,9 +9,9 @@
 #include "utils.h"
 #include "constants.h"
 
-int keygen_main(int argc, char *argv[]);
-int sign_main(int argc, char *argv[]);
-int verify_main(int argc, char *argv[]);
+int keygen(int argc, char *argv[]);
+int sign(int argc, char *argv[]);
+int verify(int argc, char *argv[]);
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
@@ -19,19 +19,22 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    ensure_matrix_cache();
+    ensure_output_directory();
+
     if (strcmp(argv[1], "keygen") == 0) {
-        return keygen_main(argc - 1, &argv[1]);
+        return keygen(argc - 1, &argv[1]);
     } else if (strcmp(argv[1], "sign") == 0) {
-        return sign_main(argc - 1, &argv[1]);
+        return sign(argc - 1, &argv[1]);
     } else if (strcmp(argv[1], "verify") == 0) {
-        return verify_main(argc - 1, &argv[1]);
+        return verify(argc - 1, &argv[1]);
     } else {
         fprintf(stderr, "Unknown command: %s\n", argv[1]);
         return 1;
     }
 }
 
-int keygen_main(int argc, char *argv[]) {
+int keygen(int argc, char *argv[]) {
     bool use_seed_mode = false;
     bool regenerate = false;
 
@@ -47,22 +50,11 @@ int keygen_main(int argc, char *argv[]) {
     }
 
     Params g1, g2, h_a;
-    size_t message_len;
-    char *msg;
-    get_user_input(&g1, &g2, &h_a, &msg, &message_len);
+    get_user_input(&g1, &g2, &h_a);
 
     struct code C_A = {get_H_A_n(), get_H_A_k(), get_H_A_d()};
     struct code C1 = {get_G1_n(), get_G1_k(), get_G1_d()};
     struct code C2 = {get_G2_n(), get_G2_k(), get_G2_d()};
-
-    FILE *param_file = fopen("params.txt", "w");
-    if (param_file) {
-        fprintf(param_file, "H_A_n %lu\n", C_A.n); fprintf(param_file, "H_A_k %lu\n", C_A.k);
-        fprintf(param_file, "H_A_d %lu\n", C_A.d); fprintf(param_file, "G1_n %lu\n", C1.n);
-        fprintf(param_file, "G1_k %lu\n", C1.k); fprintf(param_file, "G1_d %lu\n", C1.d);
-        fprintf(param_file, "G2_n %lu\n", C2.n); fprintf(param_file, "G2_k %lu\n", C2.k);
-        fprintf(param_file, "G2_d %lu\n", C2.d); fclose(param_file);
-    }
 
     nmod_mat_t H_A, G1, G2;
     nmod_mat_init(H_A, C_A.n - C_A.k, C_A.n, MOD);
@@ -83,9 +75,9 @@ int keygen_main(int argc, char *argv[]) {
     return 0;
 }
 
-int sign_main(int argc, char *argv[]) {
+int sign(int argc, char *argv[]) {
     const char *message_file = NULL;
-    const char *signature_output = "signature.bin";
+    const char *signature_output = NULL;
 
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "-m") == 0 && i + 1 < argc) {
@@ -103,8 +95,15 @@ int sign_main(int argc, char *argv[]) {
     struct code C_A, C1, C2;
     if (!load_params(&C_A, &C1, &C2)) return 1;
 
-    char *msg = read_file_or_generate(message_file, C1.k);
-    size_t msg_len = strlen(msg);
+    char *raw_msg = read_file_or_generate(message_file, C1.k);
+    if (!raw_msg) return 1;
+
+    size_t raw_len = strlen(raw_msg);
+    size_t msg_len = 0;
+    char *msg = normalize_message_length(raw_msg, raw_len, C1.k, &msg_len);
+    free(raw_msg);
+    if (!msg) return 1;
+
     const unsigned char *message = (const unsigned char *)msg;
 
     FILE *output_file = fopen(OUTPUT_PATH, "w");
@@ -130,9 +129,14 @@ int sign_main(int argc, char *argv[]) {
     generate_signature(bin_hash, message, msg_len, C_A, C1, C2,
                  H_A, G1, G2, F, signature, output_file);
 
-    save_matrix("signature_hash.txt", bin_hash);
-    save_matrix(signature_output, signature);
-    save_matrix("public_key.txt", F);
+
+    char path[MAX_FILENAME_LENGTH]; 
+    snprintf(path, sizeof(path), "%s/hash.txt", OUTPUT_DIR);
+    save_matrix(path, bin_hash);
+    snprintf(path, sizeof(path), "%s/signature.txt", OUTPUT_DIR);
+    save_matrix(path, signature);
+    snprintf(path, sizeof(path), "%s/public_key.txt", OUTPUT_DIR);
+    save_matrix(path, F);
 
     nmod_mat_clear(H_A); nmod_mat_clear(G1); nmod_mat_clear(G2);
     nmod_mat_clear(F); nmod_mat_clear(signature); nmod_mat_clear(bin_hash);
@@ -143,7 +147,7 @@ int sign_main(int argc, char *argv[]) {
     return 0;
 }
 
-int verify_main(int argc, char *argv[]) {
+int verify(int argc, char *argv[]) {
     const char *message_file = NULL;
     const char *signature_file = NULL;
 
@@ -181,13 +185,16 @@ int verify_main(int argc, char *argv[]) {
                                      NULL, generate_parity_check_matrix_from_seed,
                                      output_file, false, true, NULL);
 
-    if (!load_matrix("signature_hash.txt", bin_hash)) {
+    char path[MAX_FILENAME_LENGTH]; 
+    snprintf(path, sizeof(path), "%s/hash.txt", OUTPUT_DIR);
+    if (!load_matrix(path, bin_hash)) {
         fprintf(stderr, "Error: Could not load signature hash.\n");
         return 1;
     }
 
-    if (!load_matrix("public_key.txt", F)) {
-        fprintf(stderr, "Error: Could not load F matrix from cache.\n");
+    snprintf(path, sizeof(path), "%s/public_key.txt", OUTPUT_DIR);
+    if (!load_matrix(path, F)) {
+        fprintf(stderr, "Error: Could not load F matrix (public key) from cache.\n");
         return 1;
     }
 

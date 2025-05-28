@@ -13,7 +13,7 @@ typedef struct {
 
 void init_params(void);
 bool get_yes_no_input(const char *prompt);
-void get_user_input(Params *g1, Params *g2, Params *h, char **message, size_t *message_len);
+void get_user_input(Params *g1, Params *g2, Params *h);
 uint32_t random_range(uint32_t min, uint32_t max);
 
 uint32_t get_H_A_n(void);
@@ -25,7 +25,5 @@ uint32_t get_G1_d(void);
 uint32_t get_G2_n(void);
 uint32_t get_G2_k(void);
 uint32_t get_G2_d(void);
-const unsigned char* get_MESSAGE(void);
-size_t get_MESSAGE_LEN(void);
 
 #endif

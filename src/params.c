@@ -64,8 +64,29 @@ static void get_param_input(Params *p, const char *name) {
     } while (p->n <= p->k || p->n <= p->d);
 }
 
-void get_user_input(Params *g1, Params *g2, Params *h, char **message, size_t *message_len) {
-    if (get_yes_no_input("Do you want to use a BCH code?")) {
+void get_user_input(Params *g1, Params *g2, Params *h) {
+    char path[MAX_FILENAME_LENGTH];
+    snprintf(path, sizeof(path), "%s/params.txt", OUTPUT_DIR);
+
+    bool param_choice = false;
+    FILE *param_file = fopen(path, "r");
+    if (param_file) {
+
+        if ((param_choice = get_yes_no_input("Saved parameter file params.txt found, use it?"))) {
+            fscanf(param_file, "H_A_n %u\n", &h->n);
+            fscanf(param_file, "H_A_k %u\n", &h->k);
+            fscanf(param_file, "H_A_d %u\n", &h->d);
+            fscanf(param_file, "G1_n %u\n", &g1->n);
+            fscanf(param_file, "G1_k %u\n", &g1->k);
+            fscanf(param_file, "G1_d %u\n", &g1->d);
+            fscanf(param_file, "G2_n %u\n", &g2->n);
+            fscanf(param_file, "G2_k %u\n", &g2->k);
+            fscanf(param_file, "G2_d %u\n", &g2->d);
+            fclose(param_file);
+        }
+    }
+
+    if (!param_choice && get_yes_no_input("Do you want to use BCH code?")) {
         unsigned int m, t;
         printf("m: ");
         scanf("%u", &m);
@@ -83,7 +104,7 @@ void get_user_input(Params *g1, Params *g2, Params *h, char **message, size_t *m
         h->n = g1->n + g2->n;
         h->d = g1->d + g2->d + 1;
         h->k = h->n * (1 - binary_entropy((double) h->d / h->n));
-    } else {
+    } else if (!param_choice) {
         if (get_yes_no_input("Do you want to input G1 parameters?")) {
             get_param_input(g1, "G1");
         } else {
@@ -108,78 +129,23 @@ void get_user_input(Params *g1, Params *g2, Params *h, char **message, size_t *m
         h->d = g1->d + g2->d;
     }
 
-    if (get_yes_no_input("Do you want to input a message from a file?")) {
-        char filename[MAX_FILENAME_LENGTH] = "MSG";
-        printf("Enter the file path (leave empty for default 'MSG'): ");
-    
-        getchar(); 
-    
-        if (fgets(filename, sizeof(filename), stdin) != NULL) {
-            size_t len = strlen(filename);
-            if (len > 0 && filename[len - 1] == '\n') {
-                filename[len - 1] = '\0';
-            }
-            if (strlen(filename) == 0) {
-                strcpy(filename, "MSG");
-            }
-        }
-    
-        FILE *fp = fopen(filename, "r");
-        if (fp == NULL) {
-            fprintf(stderr, "Could not open file: %s\n", filename);
-            exit(EXIT_FAILURE);
-        }
-    
-        char *buffer = malloc(g1->k + 1);
-        if (buffer == NULL) {
-            fprintf(stderr, "Memory allocation failed\n");
-            fclose(fp);
-            exit(EXIT_FAILURE);
-        }
-    
-        if (fgets(buffer, g1->k + 1, fp) == NULL) {
-            fprintf(stderr, "Could not read message from file\n");
-            free(buffer);
-            fclose(fp);
-            exit(EXIT_FAILURE);
-        }
-    
-        *message_len = strlen(buffer);
-        if (buffer[*message_len - 1] == '\n') buffer[--(*message_len)] = '\0';
-    
-        *message = malloc(*message_len + 1);
-        if (*message == NULL) {
-            fprintf(stderr, "Memory allocation failed\n");
-            free(buffer);
-            fclose(fp);
-            exit(EXIT_FAILURE);
-        }
-    
-        strcpy(*message, buffer);
-        free(buffer);
-        fclose(fp);
-    } else {
-        char random_message[g1->k + 1];
-        for (size_t i = 0; i < g1->k; ++i) {
-            random_message[i] = random_range(65, 90);
-        }
-        random_message[g1->k] = '\0';
-
-        *message_len = g1->k;
-        *message = malloc(*message_len + 1);
-        if (*message == NULL) {
-            fprintf(stderr, "Memory allocation failed\n");
-            exit(1);
-        }
-        strcpy(*message, random_message);
-        printf("Random message used.\n");
+    param_file = fopen(path, "w");
+    if (param_file) {
+        fprintf(param_file, "H_A_n %u\n", h->n);
+        fprintf(param_file, "H_A_k %u\n", h->k);
+        fprintf(param_file, "H_A_d %u\n", h->d);
+        fprintf(param_file, "G1_n %u\n", g1->n);
+        fprintf(param_file, "G1_k %u\n", g1->k);
+        fprintf(param_file, "G1_d %u\n", g1->d);
+        fprintf(param_file, "G2_n %u\n", g2->n);
+        fprintf(param_file, "G2_k %u\n", g2->k);
+        fprintf(param_file, "G2_d %u\n", g2->d);
+        fclose(param_file);
     }
 
     G1 = *g1;
     G2 = *g2;
     H_A = *h;
-    MESSAGE = *message;
-    MESSAGE_LEN = *message_len;
 
     printf("\nC1 parameters: %u %u %u", g1->n, g1->k, g1->d);
     printf("\nC1 parameters: %u %u %u", g2->n, g2->k, g2->d);
@@ -195,5 +161,3 @@ uint32_t get_G1_d(void) { return G1.d; }
 uint32_t get_G2_n(void) { return G2.n; }
 uint32_t get_G2_k(void) { return G2.k; }
 uint32_t get_G2_d(void) { return G2.d; }
-const unsigned char* get_MESSAGE(void) { return (const unsigned char *) MESSAGE; }
-size_t get_MESSAGE_LEN(void) { return MESSAGE_LEN; }

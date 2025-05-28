@@ -1,8 +1,24 @@
 #include <stdbool.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include "params.h"
 #include "utils.h"
 #include "constants.h"
+
+void ensure_matrix_cache() {
+    struct stat st = {0};
+    if (stat("matrix_cache", &st) == -1) {
+        mkdir("matrix_cache", 0700);
+    }
+}
+
+void ensure_output_directory() {
+    struct stat st = {0};
+    if (stat(OUTPUT_DIR, &st) == -1) {
+        mkdir(OUTPUT_DIR, 0700);
+    }
+}
 
 static int compare_ints(const void* a, const void* b) {
     int arg1 = *(const int*) a;
@@ -237,7 +253,10 @@ char *read_file_or_generate(const char *filename, int msg_len) {
 }
 
 bool load_params(struct code *C_A, struct code *C1, struct code *C2) {
-    FILE *file = fopen("params.txt", "r");
+    char path[MAX_FILENAME_LENGTH];
+    snprintf(path, sizeof(path), "%s/params.txt", OUTPUT_DIR);
+
+    FILE *file = fopen(path, "r");
     if (!file) {
         fprintf(stderr, "Error: Could not open params.txt\n");
         return false;
@@ -259,4 +278,29 @@ bool load_params(struct code *C_A, struct code *C1, struct code *C2) {
 
     fclose(file);
     return true;
+}
+
+char *normalize_message_length(const char *msg, size_t msg_len, size_t target_len, size_t *final_len_out) {
+    char *fixed_msg = malloc(target_len + 1);
+    if (!fixed_msg) {
+        fprintf(stderr, "Memory allocation failed\n");
+        return NULL;
+    }
+
+    if (msg_len < target_len) {
+        memcpy(fixed_msg, msg, msg_len);
+        for (size_t i = msg_len; i < target_len; ++i) {
+            fixed_msg[i] = 'A' + (rand() % 26);
+        }
+        printf("Warning: message too short — padded to %lu chars\n", target_len);
+    } else if (msg_len > target_len) {
+        memcpy(fixed_msg, msg, target_len);
+        printf("Warning: message too long — truncated to %lu chars\n", target_len);
+    } else {
+        memcpy(fixed_msg, msg, target_len);
+    }
+
+    fixed_msg[target_len] = '\0';
+    if (final_len_out) *final_len_out = target_len;
+    return fixed_msg;
 }
