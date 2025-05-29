@@ -15,7 +15,7 @@ SRCS = $(SRC_DIR)/main.c \
        $(SRC_DIR)/verifier.c
 
 OBJS = $(SRCS:.c=.o)
-TARGET = main
+TARGET = sig
 
 .PHONY: all clean
 

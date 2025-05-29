@@ -55,7 +55,7 @@ dkms.conf
 .vscode
 
 .DS_STORE
-main
+sig
 output
 params.txt
 message.txt
