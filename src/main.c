@@ -164,14 +164,17 @@ int verify(int argc, char *argv[]) {
         return 1;
     }
 
-    char *msg = read_file(message_file);
-    size_t msg_len = strlen(msg);
+    struct code C_A, C1, C2;
+    if (!load_params(&C_A, &C1, &C2)) return 1;
+
+    char *raw_msg = read_file(message_file);
+    size_t raw_len = strlen(raw_msg);
+    size_t msg_len = 0;
+    char *msg = normalize_message_length(raw_msg, raw_len, C1.k, &msg_len);
+    free(raw_msg);
     const unsigned char *message = (const unsigned char *)msg;
 
     FILE *output_file = fopen(OUTPUT_PATH, "w");
-
-    struct code C_A, C1, C2;
-    if (!load_params(&C_A, &C1, &C2)) return 1;
 
     nmod_mat_t H_A, F, signature, bin_hash;
     nmod_mat_init(H_A, C_A.n - C_A.k, C_A.n, MOD);
@@ -205,8 +208,3 @@ int verify(int argc, char *argv[]) {
     fclose(output_file); free(msg);
     return 0;
 }
-
-// clock_t begin = clock();
-//     clock_t end = clock();
-//     double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-//     fprintf(timing_file, "main(): %lf\n", time_spent);

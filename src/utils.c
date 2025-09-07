@@ -287,7 +287,7 @@ char *normalize_message_length(const char *msg, size_t msg_len, size_t target_le
     if (msg_len < target_len) {
         memcpy(fixed_msg, msg, msg_len);
         for (size_t i = msg_len; i < target_len; ++i) {
-            fixed_msg[i] = 'A' + (rand() % 26);
+            fixed_msg[i] = ' ';
         }
         printf("Warning: message too short — padded to %lu chars\n", target_len);
     } else if (msg_len > target_len) {

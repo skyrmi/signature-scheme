@@ -1,16 +1,19 @@
 #include <string.h>
 #include <sodium.h>
+#include <math.h>
+#include <stdint.h>
 #include "keygen.h"
 #include "matrix.h"     
 #include "utils.h"
 #include "params.h"
 #include "constants.h"
+#include "bch.h"
 
 void generate_random_seed(unsigned char *seed) {
     randombytes_buf(seed, SEED_SIZE);
 }
 
-void create_generator_matrix(slong n, slong k, slong d, nmod_mat_t gen_matrix, FILE *output_file) { 
+void create_generator_matrix_old(slong n, slong k, slong d, nmod_mat_t gen_matrix, FILE *output_file) { 
     flint_rand_t state;
     flint_randinit(state);
 
@@ -18,6 +21,22 @@ void create_generator_matrix(slong n, slong k, slong d, nmod_mat_t gen_matrix, F
     nmod_mat_randtest(gen_matrix, state);
 
     flint_randclear(state);
+}
+
+// For BCH code generator matrix generation
+void create_generator_matrix(slong n, slong k, slong d, nmod_mat_t gen_matrix, FILE *output_file) {
+    int m = log2(n + 1);
+    int t = floor(d / 2);
+
+    uint8_t *gpoly; uint32_t gdeg; uint32_t k_out;
+    bch_genpoly(m, t, &gpoly, &gdeg);
+    uint8_t **M = bch_generator_matrix_bytes(gpoly, gdeg, n, &k_out);
+
+    nmod_mat_init(gen_matrix, k_out, n, MOD);
+    copy_matrix_to_nmod_mat(gen_matrix, M, k_out, n);
+
+    free_matrix_bytes(M, k_out);
+    free(gpoly);
 }
 
 void generate_parity_check_matrix(slong n, slong k, slong d, nmod_mat_t H, FILE *output_file) {

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sodium.h>
+#include <stdint.h>
 #include "params.h"
 #include "constants.h"
 
@@ -26,6 +27,43 @@ static void generate_random_params(Params *p) {
         p->k = random_range(6, 7);
         p->d = random_range(3, 4);
     } while (p->n <= p->k || p->n <= p->d);
+}
+
+static int bch_compute_k_from_mt(int m, int t, uint32_t *k_out, uint32_t *r_out) {
+    if (m < 1 || m > 31) return -1;           
+    if (t < 1) return -2;
+
+    uint32_t n = ((uint32_t)1 << m) - 1u;
+    uint32_t max_req = 2u * (uint32_t)t;
+    if (max_req >= n) return -3;              
+
+    char *covered = (char *) calloc(n, sizeof(char));
+    if (!covered) return -4;
+
+    uint32_t r = 0;
+
+    for (uint32_t a = 1; a <= max_req; ++a) {
+        uint32_t p = a % n;
+        if (covered[p]) continue;
+
+        /* walk coset starting at p: p, 2p mod n, 4p mod n, ... */
+        uint32_t cur = p;
+        uint32_t coset_size = 0;
+        do {
+            covered[cur] = 1;
+            ++coset_size;
+            cur = (cur * 2u) % n;
+        } while (cur != p);
+
+        r += coset_size;
+    }
+
+    free(covered);
+
+    uint32_t k = n - r;
+    if (k_out) *k_out = k;
+    if (r_out) *r_out = r;
+    return 0;
 }
 
 bool get_yes_no_input(const char *prompt) {
@@ -92,7 +130,9 @@ void get_user_input(Params *g1, Params *g2, Params *h) {
 
         unsigned int n = (1 << m) - 1;
         unsigned int d = 2 * t + 1;
-        unsigned int k = m * t;
+        unsigned int k_out, r_out;
+        bch_compute_k_from_mt(m, t, &k_out, &r_out);
+        unsigned int k = k_out;
 
         g1->n = g2->n = n;
         g1->k = g2->k = k;
@@ -145,7 +185,7 @@ void get_user_input(Params *g1, Params *g2, Params *h) {
     H_A = *h;
 
     printf("\nC1 parameters: %u %u %u", g1->n, g1->k, g1->d);
-    printf("\nC1 parameters: %u %u %u", g2->n, g2->k, g2->d);
+    printf("\nC2 parameters: %u %u %u", g2->n, g2->k, g2->d);
     printf("\nC_A parameters: %u %u %u\n\n", h->n, h->k, h->d);
 }
 
