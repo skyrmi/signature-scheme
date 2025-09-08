@@ -12,7 +12,8 @@ SRCS = $(SRC_DIR)/main.c \
        $(SRC_DIR)/params.c \
        $(SRC_DIR)/keygen.c \
        $(SRC_DIR)/signer.c \
-       $(SRC_DIR)/verifier.c
+       $(SRC_DIR)/verifier.c \
+       $(SRC_DIR)/bch.c
 
 OBJS = $(SRCS:.c=.o)
 TARGET = sig
