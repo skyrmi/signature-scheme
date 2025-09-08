@@ -142,29 +142,33 @@ void get_user_input(Params *g1, Params *g2, Params *h) {
         h->d = 2 * (g1->d + g2->d) + 1;
         h->k = h->n * (1 - binary_entropy((double) h->d / h->n));
     } else if (!param_choice) {
-        if (get_yes_no_input("Do you want to input G1 parameters?")) {
-            get_param_input(g1, "G1");
-        } else {
-            generate_random_params(g1);
-            printf("G1 parameters randomly generated.\n");
-        }
-
-        if (get_yes_no_input("Do you want to input G2 parameters?")) {
-            get_param_input(g2, "G2");
-            if (g1->k != g2->k) {
-                fprintf(stderr, "Different values for k, setting G2->k to %u\n", g1->k);
-                g2->k = g1->k;
-            }
-        } else {
-            generate_random_params(g2);
-            g2->k = g1->k;
-            printf("G2 parameters randomly generated.\n");
-        }
-
-        h->n = g1->n + g2->n;
-        h->k = g1->k;
-        h->d = g1->d + g2->d;
+        printf("Key generation requires BCH Code parameters");
+        exit(EXIT_FAILURE);
     }
+    // else if (!param_choice) {
+    //     if (get_yes_no_input("Do you want to input G1 parameters?")) {
+    //         get_param_input(g1, "G1");
+    //     } else {
+    //         generate_random_params(g1);
+    //         printf("G1 parameters randomly generated.\n");
+    //     }
+
+    //     if (get_yes_no_input("Do you want to input G2 parameters?")) {
+    //         get_param_input(g2, "G2");
+    //         if (g1->k != g2->k) {
+    //             fprintf(stderr, "Different values for k, setting G2->k to %u\n", g1->k);
+    //             g2->k = g1->k;
+    //         }
+    //     } else {
+    //         generate_random_params(g2);
+    //         g2->k = g1->k;
+    //         printf("G2 parameters randomly generated.\n");
+    //     }
+
+    //     h->n = g1->n + g2->n;
+    //     h->k = g1->k;
+    //     h->d = g1->d + g2->d;
+    // }
 
     param_file = fopen(PARAM_PATH, "w");
     if (param_file) {
