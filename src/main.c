@@ -126,13 +126,14 @@ int sign(int argc, char *argv[]) {
                                      NULL, create_generator_matrix_from_seed,
                                      output_file, false, true, NULL);
 
+    const unsigned int salt_len = SALT_LEN;
+    unsigned char salt[salt_len];
     generate_signature(bin_hash, message, msg_len, C_A, C1, C2,
-                 H_A, G1, G2, F, signature, output_file);
-
+                 H_A, G1, G2, F, signature, salt_len, salt, output_file);
 
     char path[MAX_FILENAME_LENGTH]; 
-    snprintf(path, sizeof(path), "%s/hash.txt", OUTPUT_DIR);
-    save_matrix(path, bin_hash);
+    snprintf(path, sizeof(path), "%s/salt.txt", OUTPUT_DIR);
+    save_to_file(salt, salt_len, path);
     snprintf(path, sizeof(path), "%s/signature.txt", OUTPUT_DIR);
     save_matrix(path, signature);
     snprintf(path, sizeof(path), "%s/public_key.txt", OUTPUT_DIR);
@@ -180,7 +181,6 @@ int verify(int argc, char *argv[]) {
     nmod_mat_init(H_A, C_A.n - C_A.k, C_A.n, MOD);
     nmod_mat_init(F, C_A.n - C_A.k, C1.k, MOD);
     nmod_mat_init(signature, 1, C_A.n, MOD);
-    nmod_mat_init(bin_hash, 1, msg_len, MOD);
 
     load_matrix(signature_file, signature);
 
@@ -189,11 +189,8 @@ int verify(int argc, char *argv[]) {
                                      output_file, false, true, NULL);
 
     char path[MAX_FILENAME_LENGTH]; 
-    snprintf(path, sizeof(path), "%s/hash.txt", OUTPUT_DIR);
-    if (!load_matrix(path, bin_hash)) {
-        fprintf(stderr, "Error: Could not load signature hash.\n");
-        return 1;
-    }
+    snprintf(path, sizeof(path), "%s/salt.txt", OUTPUT_DIR);
+    unsigned char *salt = (unsigned char *) read_file(path);
 
     snprintf(path, sizeof(path), "%s/public_key.txt", OUTPUT_DIR);
     if (!load_matrix(path, F)) {
@@ -201,10 +198,10 @@ int verify(int argc, char *argv[]) {
         return 1;
     }
 
-    verify_signature(bin_hash, msg_len, C_A.n, signature, F, C_A, H_A, output_file);
+    verify_signature(message, msg_len, salt, SALT_LEN, C_A.n, signature, F, C_A, H_A, output_file);
 
     nmod_mat_clear(H_A); nmod_mat_clear(F);
-    nmod_mat_clear(signature); nmod_mat_clear(bin_hash);
-    fclose(output_file); free(msg);
+    nmod_mat_clear(signature);
+    fclose(output_file); free(msg); free(salt);
     return 0;
 }

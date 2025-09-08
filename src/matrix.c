@@ -15,6 +15,18 @@ void print_matrix(FILE *fp, nmod_mat_t matrix) {
     }
 }
 
+void print_matrix_transpose(FILE *fp, nmod_mat_t matrix) {
+    fprintf(fp, "<%ld x %ld matrix transpose>\n", matrix->r, matrix->c);
+    for (int i = 0; i < matrix->c; i++) {  
+        fprintf(fp, "[ ");
+        for (int j = 0; j < matrix->r; j++) {  
+            fprintf(fp, "%ld ", nmod_mat_get_entry(matrix, j, i));  
+        }
+        fprintf(fp, "]");
+        fprintf(fp, "\n");
+    }
+}
+
 void transpose_matrix(int rows, int cols, int matrix[rows][cols], int transpose[cols][rows]) {
     for (int i = 0; i < rows; i++) {
         for (int j = 0; j < cols; j++) {

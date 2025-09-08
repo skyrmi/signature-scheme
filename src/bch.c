@@ -26,7 +26,7 @@ static const uint32_t prim_poly_table[] = {
     0x201Bu, /* m=13 */
     0x4443u, /* m=14 */
     0x8003u, /* m=15 */
-    0x1100Bu /* m=16 (unused) */
+    0x1100Bu /* (unused) */
 };
 
 /* -------------------
@@ -96,7 +96,6 @@ static void gf_free(gf_t *g)
     free(g->log); g->log = NULL;
 }
 
-/* multiply two field elements given in polynomial representation */
 static uint32_t gf_mul_elem(const gf_t *g, uint32_t a, uint32_t b)
 {
     if (!g) return 0;
@@ -108,10 +107,6 @@ static uint32_t gf_mul_elem(const gf_t *g, uint32_t a, uint32_t b)
     return g->exp[e];
 }
 
-/* -------------------
-   Cyclotomic coset (mod n): for exponent a, coset = { a, 2a mod n, 4a mod n, ... }
-   Returns dynamically allocated array; caller frees.
-   ------------------- */
 static uint32_t *cyclotomic_coset(const gf_t *g, uint32_t a, uint32_t *out_sz)
 {
     uint32_t n = g->n;

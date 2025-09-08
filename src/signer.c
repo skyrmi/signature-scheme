@@ -10,7 +10,8 @@
 void generate_signature(nmod_mat_t bin_hash, const unsigned char* message, size_t message_len,
                   struct code C_A, struct code C1, struct code C2,
                   nmod_mat_t H_A, nmod_mat_t G1, nmod_mat_t G2,
-                  nmod_mat_t F, nmod_mat_t signature, FILE* output_file)
+                  nmod_mat_t F, nmod_mat_t signature, const unsigned int salt_len, 
+                  unsigned char* salt, FILE* output_file)
 {
     unsigned long *J = malloc(C1.n * sizeof(unsigned long));
     generate_random_set(C_A.n, C1.n, J);
@@ -61,9 +62,8 @@ void generate_signature(nmod_mat_t bin_hash, const unsigned char* message, size_
 
     nmod_mat_mul(F, H_A, G_star_T);
 
+    unsigned char salted_message[message_len + salt_len];
     do {
-        const unsigned int salt_len = message_len;
-        unsigned char salted_message[message_len + salt_len];
         for (int i = 0; i < message_len; ++i)
             salted_message[i] = message[i];
         for (int i = message_len; i < message_len + salt_len; ++i)
@@ -80,6 +80,10 @@ void generate_signature(nmod_mat_t bin_hash, const unsigned char* message, size_
 
         nmod_mat_mul(signature, bin_hash, G_star);
     } while (weight(signature) < C_A.d);
+
+    for (int i = message_len; i < message_len + salt_len; ++i) {
+        salt[i - message_len] = salted_message[i]; 
+    }
 
     if (PRINT) {
         fprintf(output_file, "\nHash:\n\n");

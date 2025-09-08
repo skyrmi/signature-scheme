@@ -139,7 +139,7 @@ void get_user_input(Params *g1, Params *g2, Params *h) {
         g1->d = g2->d = d;
 
         h->n = g1->n + g2->n;
-        h->d = g1->d + g2->d + 1;
+        h->d = 2 * (g1->d + g2->d) + 1;
         h->k = h->n * (1 - binary_entropy((double) h->d / h->n));
     } else if (!param_choice) {
         if (get_yes_no_input("Do you want to input G1 parameters?")) {

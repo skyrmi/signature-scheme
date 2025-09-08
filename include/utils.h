@@ -19,6 +19,7 @@ int file_exists(const char* filename);
 char* generate_seed_filename(const char* prefix, int n, int k, int d);
 bool save_seed(const char* filename, const unsigned char *seed);
 bool load_seed(const char* filename, unsigned char *seed);
+void save_to_file(const unsigned char *salt, size_t length, const char *filename);
 char *read_file(const char *filename);
 char *read_file_or_generate(const char *filename, int msg_len);
 bool load_params(struct code *C_A, struct code *C1, struct code *C2);

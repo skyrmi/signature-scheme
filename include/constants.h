@@ -2,6 +2,7 @@
 #define CONSTANTS_H
 
 #define MOD 2
+#define SALT_LEN 4
 #define PRINT true
 #define SEED_SIZE 32
 #define PARAM_PATH "params.txt"

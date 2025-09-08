@@ -171,6 +171,17 @@ bool load_seed(const char* filename, unsigned char *seed) {
     return read == SEED_SIZE;
 }
 
+void save_to_file(const unsigned char *data, size_t length, const char *filename) {
+    FILE *file = fopen(filename, "w");  
+    if (file == NULL) {
+        perror("Failed to open file");
+        return;
+    }
+    
+    fwrite(data, sizeof(char), length, file);  
+    fclose(file);  
+}
+
 char *read_file(const char *filename) {
     FILE *fp = fopen(filename, "r");
     if (!fp) {
