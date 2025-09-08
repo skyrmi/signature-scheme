@@ -8,6 +8,7 @@
 
 /* -------------------
    Primitive polynomials table (bitmask includes bit for x^m)
+   Works for m = 1..15, can be extended to higher powers if needed
    ------------------- */
 static const uint32_t prim_poly_table[] = {
     0u,      /* unused index 0 */
@@ -29,11 +30,6 @@ static const uint32_t prim_poly_table[] = {
     0x1100Bu /* (unused) */
 };
 
-/* -------------------
-   GF(2^m) helper (small, table-based)
-   Elements are represented as uint32_t (bit-polynomial).
-   We build exp/log tables with alpha = x (polynomial '10'b -> value 2).
-   ------------------- */
 typedef struct {
     int m;
     uint32_t prim; /* primitive polynomial, bit for x^m included */
@@ -43,7 +39,6 @@ typedef struct {
     int *log;      /* length q, log[0] = -1 */
 } gf_t;
 
-/* multiply polynomial a*b modulo prim (primitive polynomial) */
 static uint32_t gf_mul_poly_reduce(uint32_t a, uint32_t b, uint32_t prim, int m)
 {
     uint64_t aa = a;
@@ -79,7 +74,7 @@ static int gf_init(gf_t *g, int m, uint32_t prim_with_top)
         return 0;
     }
     uint32_t cur = 1;
-    uint32_t alpha = 2u; /* polynomial x */
+    uint32_t alpha = 2u;
     for (uint32_t i = 0; i < g->n; ++i) {
         g->exp[i] = cur;
         g->log[cur] = (int)i;
@@ -121,9 +116,6 @@ static uint32_t *cyclotomic_coset(const gf_t *g, uint32_t a, uint32_t *out_sz)
     return buf;
 }
 
-/* Multiply two polynomials with coefficients in GF(2^m) where coefficients
-   are stored as field elements (uint32_t). Return newly allocated result.
-*/
 static uint32_t *poly_mul_field(const gf_t *g, const uint32_t *A, uint32_t degA, const uint32_t *B, uint32_t degB)
 {
     uint32_t degR = degA + degB;
@@ -133,47 +125,46 @@ static uint32_t *poly_mul_field(const gf_t *g, const uint32_t *A, uint32_t degA,
         for (uint32_t j = 0; j <= degB; ++j) {
             if (B[j] == 0) continue;
             uint32_t p = gf_mul_elem(g, A[i], B[j]);
-            R[i + j] ^= p; /* addition in GF(2^m) represented as XOR of polynomial bits */
+            R[i + j] ^= p;
         }
     }
     return R;
 }
 
-/* Compute minimal polynomial (over GF(2)) for cyclotomic coset `powers` with size `sz`.
-   We compute product_{r in coset} (x + alpha^{r}) using field arithmetic; final coefficients
-   should be in {0,1}. We return a bit vector (LSB const term). Caller frees returned array.
+/* Computes minimal polynomial (over GF(2)) for cyclotomic coset `powers` with size `sz`.
+   Computes product_{r in coset} (x + alpha^{r}) using field arithmetic. 
+   Returns a bit vector (LSB const term).
    degree_out set to degree.
 */
 static uint8_t *minimal_polynomial_from_coset(const gf_t *g, const uint32_t *powers, uint32_t sz, uint32_t *degree_out)
 {
-    /* poly in field coeffs: start with 1 */
+    // poly in field coeffs: start with 1
     uint32_t *poly = (uint32_t *) calloc(1, sizeof(uint32_t));
     poly[0] = 1; uint32_t deg = 0;
 
     for (uint32_t i = 0; i < sz; ++i) {
-        uint32_t root = g->exp[powers[i]]; /* alpha^{powers[i]} */
+        uint32_t root = g->exp[powers[i]]; // alpha^{powers[i]} 
         uint32_t factor[2];
-        factor[0] = root; factor[1] = 1; /* (x + root) -> [root, 1] */
+        factor[0] = root; factor[1] = 1; // (x + root) -> [root, 1]
         uint32_t *newpoly = poly_mul_field(g, poly, deg, factor, 1);
         free(poly);
         poly = newpoly;
         deg = deg + 1;
     }
 
-    /* Convert field coefficients to bits (0 or 1). In correct theory they are 0/1.
-       If an element is neither 0 nor 1, treat non-zero as 1 (robustness). */
+    // Convert field coefficients to bits (0 or 1)
     uint8_t *out = (uint8_t *) calloc(deg + 1, sizeof(uint8_t));
     for (uint32_t i = 0; i <= deg; ++i) {
         if (poly[i] == 0u) out[i] = 0;
         else if (poly[i] == 1u) out[i] = 1;
-        else out[i] = 1; /*fallback*/
+        else out[i] = 1; // fallback
     }
     free(poly);
     *degree_out = deg;
     return out;
 }
 
-/* Multiply two bit-polynomials (coeffs in {0,1}) */
+// Multiply two bit-polynomials (coeffs in {0,1})
 static uint8_t *poly_mul_bits(const uint8_t *A, uint32_t degA, const uint8_t *B, uint32_t degB)
 {
     uint32_t degR = degA + degB;
@@ -189,7 +180,7 @@ static uint8_t *poly_mul_bits(const uint8_t *A, uint32_t degA, const uint8_t *B,
 }
 
 /* Compute generator polynomial for designed distance = 2*t + 1 (roots alpha^1 .. alpha^{2t})
-   Returns bit-vector gpoly (LSB = constant), degree in deg_out. Caller frees gpoly.
+   Returns bit-vector gpoly (LSB = constant), degree in deg_out.
    Supported m range: 1..15 (based on primitive polynomial table)
 */
 int bch_genpoly(int m, int t, uint8_t **gpoly_out, uint32_t *deg_out)
@@ -204,7 +195,7 @@ int bch_genpoly(int m, int t, uint8_t **gpoly_out, uint32_t *deg_out)
     }
 
     uint32_t prim = prim_poly_table[m];
-    if ((prim & (1u << m)) == 0) prim |= (1u << m); /* ensure top bit present */
+    if ((prim & (1u << m)) == 0) prim |= (1u << m);
 
     gf_t g;
     if (gf_init(&g, m, prim) != 0) {
@@ -221,10 +212,10 @@ int bch_genpoly(int m, int t, uint8_t **gpoly_out, uint32_t *deg_out)
         return -4;
     }
 
-    /* keep track of covered exponents */
+    //covered exponents 
     char *covered = (char *) calloc(n, sizeof(char));
 
-    /* generator poly start = 1 */
+    // generator poly start = 1 
     uint8_t *gpoly = (uint8_t *) calloc(1, sizeof(uint8_t));
     gpoly[0] = 1; uint32_t gdeg = 0;
 
@@ -253,10 +244,6 @@ int bch_genpoly(int m, int t, uint8_t **gpoly_out, uint32_t *deg_out)
     return 0;
 }
 
-/* Build k x n byte matrix (rows k, cols n) where rows are g(x), x*g(x), ... x^{k-1}g(x).
-   Returns a pointer to an array-of-rows (bytes). Caller frees with free_matrix_bytes.
-   Note: gpoly LSB is constant term, degree gdeg = r = n - k.
-*/
 static uint8_t **alloc_matrix_bytes(uint32_t k, uint32_t n)
 {
     uint8_t **M = (uint8_t **) malloc(k * sizeof(uint8_t *));
@@ -279,7 +266,6 @@ void free_matrix_bytes(uint8_t **M, uint32_t k)
     free(M);
 }
 
-/* gpoly: bits length gdeg+1 (LSB constant). n = 2^m - 1; k = n - gdeg */
 uint8_t **bch_generator_matrix_bytes(const uint8_t *gpoly, uint32_t gdeg, uint32_t n, uint32_t *k_out)
 {
     if (!gpoly) return NULL;
@@ -291,13 +277,12 @@ uint8_t **bch_generator_matrix_bytes(const uint8_t *gpoly, uint32_t gdeg, uint32
 
     /* For row i (0..k-1) put coefficients of x^i * g(x) at positions for powers x^{i+j}
        Let column index 0 correspond to x^{n-1}, column n-1 to x^0 (so leftmost top = highest degree).
-       For simplicity we fill columns so that M[i][col] = coefficient for corresponding power.
     */
     for (uint32_t i = 0; i < k; ++i) {
         for (uint32_t j = 0; j <= r; ++j) {
             if (!gpoly[j]) continue;
-            uint32_t power = i + j; /* power of x */
-            if (power >= n) continue; /* do not wrap (cyclic shift not applied here) */
+            uint32_t power = i + j; 
+            if (power >= n) continue; 
             uint32_t col = n - 1 - power;
             M[i][col] = 1;
         }
@@ -307,7 +292,6 @@ uint8_t **bch_generator_matrix_bytes(const uint8_t *gpoly, uint32_t gdeg, uint32
     return M;
 }
 
-/* Copy byte matrix into FLINT nmod_mat_t (assumes initialized modulus=2 and dims match) */
 void copy_matrix_to_nmod_mat(nmod_mat_t M, uint8_t **bytes, uint32_t k, uint32_t n)
 {
     for (uint32_t i = 0; i < k; ++i) {
