@@ -98,9 +98,8 @@ Output:
 
 Output: 
 
-- `final_message.txt`: normalized message
 - `signature.txt`: signature matrix
-- `hash.txt`: hash used in signing
+- `salt.txt`: random salt added to message
 - `public_key.txt`: public key
 
 ## Verifying a Signature
@@ -109,7 +108,7 @@ Output:
 ./sig verify -m <message-file> -s <signature-file>
 ```
 
-- Uses previously saved `signature.txt`, `public_key.txt`, and `params.txt`
+- Uses previously saved `signature.txt`, `public_key.txt`, `salt.txt`, and `params.txt`
 - Verifies the signature from <signature-file> against the message
 
 Output:
