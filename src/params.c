@@ -102,21 +102,29 @@ static void get_param_input(Params *p, const char *name) {
     } while (p->n <= p->k || p->n <= p->d);
 }
 
+void get_param(FILE *file, const char *format, void *param) {
+    if (fscanf(file, format, param) != 1) {
+        fprintf(stderr, "Error reading parameter with format: %s\n", format);
+        exit(EXIT_FAILURE);
+    }
+}
+
 void get_user_input(Params *g1, Params *g2, Params *h) {
     bool param_choice = false;
     FILE *param_file = fopen(PARAM_PATH, "r");
     if (param_file) {
 
         if ((param_choice = get_yes_no_input("Saved parameter file params.txt found, use it?"))) {
-            fscanf(param_file, "H_A_n %u\n", &h->n);
-            fscanf(param_file, "H_A_k %u\n", &h->k);
-            fscanf(param_file, "H_A_d %u\n", &h->d);
-            fscanf(param_file, "G1_n %u\n", &g1->n);
-            fscanf(param_file, "G1_k %u\n", &g1->k);
-            fscanf(param_file, "G1_d %u\n", &g1->d);
-            fscanf(param_file, "G2_n %u\n", &g2->n);
-            fscanf(param_file, "G2_k %u\n", &g2->k);
-            fscanf(param_file, "G2_d %u\n", &g2->d);
+            get_param(param_file, "H_A_n %u\n", &h->n);
+            get_param(param_file, "H_A_k %u\n", &h->k);
+            get_param(param_file, "H_A_d %u\n", &h->d);
+            get_param(param_file, "G1_n %u\n", &g1->n);
+            get_param(param_file, "G1_k %u\n", &g1->k);
+            get_param(param_file, "G1_d %u\n", &g1->d);
+            get_param(param_file, "G2_n %u\n", &g2->n);
+            get_param(param_file, "G2_k %u\n", &g2->k);
+            get_param(param_file, "G2_d %u\n", &g2->d);
+            
             fclose(param_file);
         }
     }
@@ -124,9 +132,15 @@ void get_user_input(Params *g1, Params *g2, Params *h) {
     if (!param_choice && get_yes_no_input("Do you want to use BCH code?")) {
         unsigned int m, t;
         printf("m: ");
-        scanf("%u", &m);
+        if (scanf("%u", &m) != 1) {
+            printf("Could not read 'm'\n");
+            exit(EXIT_FAILURE);
+        }
         printf("t: ");
-        scanf("%u", &t);
+        if (scanf("%u", &t) != 1) {
+            printf("Could not read 't'\n");
+            exit(EXIT_FAILURE);
+        }
 
         unsigned int n = (1 << m) - 1;
         unsigned int d = 2 * t + 1;

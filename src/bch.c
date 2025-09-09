@@ -296,7 +296,7 @@ void copy_matrix_to_nmod_mat(nmod_mat_t M, uint8_t **bytes, uint32_t k, uint32_t
 {
     for (uint32_t i = 0; i < k; ++i) {
         for (uint32_t j = 0; j < n; ++j) {
-            nmod_mat_set_entry(M, i, j, (mp_limb_t) bytes[i][j]);
+            nmod_mat_set_entry(M, i, j, bytes[i][j]);
         }
     }
 }
