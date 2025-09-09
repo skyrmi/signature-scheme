@@ -13,6 +13,17 @@ void generate_random_seed(unsigned char *seed) {
     randombytes_buf(seed, SEED_SIZE);
 }
 
+// for general linear codes
+// void create_generator_matrix_old(slong n, slong k, slong d, nmod_mat_t gen_matrix, FILE *output_file) { 
+//     flint_rand_t state;
+//     flint_randinit(state);
+
+//     nmod_mat_init(gen_matrix, k, n, MOD);
+//     nmod_mat_randtest(gen_matrix, state);
+
+//     flint_randclear(state);
+// }
+
 // For BCH code generator matrix generation
 void create_generator_matrix(slong n, slong k, slong d, nmod_mat_t gen_matrix, FILE *output_file) {
     int m = log2(n + 1);
@@ -29,8 +40,16 @@ void create_generator_matrix(slong n, slong k, slong d, nmod_mat_t gen_matrix, F
     free(gpoly);
 }
 
+// void generate_parity_check_matrix(slong n, slong k, slong d, nmod_mat_t H, FILE *output_file) {
+//     flint_rand_t state;
+//     flint_randinit(state);
+    
+//     nmod_mat_randtest(H, state);
+//     flint_randclear(state);
+// }
+
 void generate_parity_check_matrix(slong n, slong k, slong d, nmod_mat_t H, FILE *output_file) {
-    size_t num_bytes = n * k + 1;
+    size_t num_bytes = (n - k) * n + 1;
     unsigned char *random_buffer = (unsigned char *) malloc(num_bytes);
 
     if (random_buffer == NULL) {
@@ -43,10 +62,10 @@ void generate_parity_check_matrix(slong n, slong k, slong d, nmod_mat_t H, FILE 
     unsigned char *current_byte = random_buffer;
     size_t bit_pos = 0;
 
-    for (slong i = 0; i < n; i++) {
-        for (slong j = 0; j < k; j++) {
+    for (slong i = 0; i < n - k; i++) {
+        for (slong j = 0; j < n; j++) {
             unsigned int random_bit = (*current_byte >> (7 - bit_pos)) & 1;
-            nmod_mat_entry(H, i, j) = random_bit;
+            nmod_mat_set_entry(H, i, j, random_bit);
             bit_pos++;
 
             if (bit_pos == 8) {
@@ -56,7 +75,6 @@ void generate_parity_check_matrix(slong n, slong k, slong d, nmod_mat_t H, FILE 
         }
     }
 
-    // Free the buffer after use
     free(random_buffer);
 }
 
